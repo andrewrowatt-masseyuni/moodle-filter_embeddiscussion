@@ -26,6 +26,26 @@ defined('MOODLE_INTERNAL') || die();
 
 if ($ADMIN->fulltree) {
     $settings->add(new admin_setting_heading(
+        'filter_embeddiscussion/legacytokens',
+        get_string('settings_legacytokens', 'filter_embeddiscussion'),
+        get_string('settings_legacytokens_desc', 'filter_embeddiscussion')
+    ));
+
+    $settings->add(new admin_setting_configcheckbox(
+        'filter_embeddiscussion/legacycomments',
+        get_string('setting_legacycomments', 'filter_embeddiscussion'),
+        get_string('setting_legacycomments_desc', 'filter_embeddiscussion'),
+        0
+    ));
+
+    $settings->add(new admin_setting_configcheckbox(
+        'filter_embeddiscussion/legacyfilterdisqus',
+        get_string('setting_legacyfilterdisqus', 'filter_embeddiscussion'),
+        get_string('setting_legacyfilterdisqus_desc', 'filter_embeddiscussion'),
+        0
+    ));
+
+    $settings->add(new admin_setting_heading(
         'filter_embeddiscussion/general',
         get_string('settings_general', 'filter_embeddiscussion'),
         ''

@@ -35,8 +35,9 @@ namespace filter_embeddiscussion;
  *   - lock | locked     - the thread is locked (no new posts or edits).
  *   - anon | anonymous  - student posts are shown with anonymous handles.
  *
- * Legacy syntaxes (drop-in replacement for filter_disqus and the {comments} block) are
- * also recognised and rewritten to the canonical token before processing:
+ * Legacy syntaxes (drop-in replacement for filter_disqus and the {comments}
+ * block) can also be recognised and rewritten to the canonical token before
+ * processing when enabled via site settings:
  *   - [[filter_disqus]]                 -> {embeddiscussion:<page name>}
  *   - [[filter_disqus:<url_segment>]]   -> {embeddiscussion:<page name> (<url_segment>)}
  *   - {comments}                        -> {embeddiscussion:<page name>}
@@ -75,9 +76,12 @@ class text_filter extends \core_filters\text_filter {
             return $text;
         }
 
-        // Rewrite any legacy filter_disqus / {comments} tokens to the canonical token first.
-        if (preg_match(self::LEGACY_PATTERN, $text)) {
-            $text = self::convert_legacy_tokens($text);
+        $disqusenabled = self::legacy_disqus_tokens_enabled();
+        $commentsenabled = self::legacy_comments_tokens_enabled();
+
+        // Rewrite any enabled legacy tokens to the canonical token first.
+        if (($disqusenabled || $commentsenabled) && preg_match(self::LEGACY_PATTERN, $text)) {
+            $text = self::convert_legacy_tokens($text, $disqusenabled, $commentsenabled);
         }
 
         if (\stripos($text, 'iscussion') === false) {
@@ -183,41 +187,82 @@ class text_filter extends \core_filters\text_filter {
     }
 
     /**
-     * Rewrite legacy filter_disqus / {comments} tokens in text to the canonical
-     * {embeddiscussion:...} token, deriving the thread name from $PAGE->title.
+     * Rewrite enabled legacy filter_disqus / {comments} tokens in text to the
+     * canonical {embeddiscussion:...} token, deriving the thread name from
+     * $PAGE->title.
      *
      * If the page title is unavailable (for example, when the filter runs in a
      * context without a fully-initialised page), the legacy tokens are left
      * untouched so that the original text is preserved.
      *
      * @param string $text the text being filtered
+     * @param bool|null $disqusenabled whether [[filter_disqus]] tokens should be converted;
+     *                                 null to read site configuration
+     * @param bool|null $commentsenabled whether {comments} tokens should be converted;
+     *                                   null to read site configuration
      * @return string the text with any legacy tokens rewritten
      */
-    public static function convert_legacy_tokens(string $text): string {
+    public static function convert_legacy_tokens(
+        string $text,
+        ?bool $disqusenabled = null,
+        ?bool $commentsenabled = null
+    ): string {
+        if ($disqusenabled === null) {
+            $disqusenabled = self::legacy_disqus_tokens_enabled();
+        }
+        if ($commentsenabled === null) {
+            $commentsenabled = self::legacy_comments_tokens_enabled();
+        }
+        if (!$disqusenabled && !$commentsenabled) {
+            return $text;
+        }
+
         $pagename = self::derive_current_page_name();
         if ($pagename === '') {
             return $text;
         }
 
-        $text = preg_replace_callback(
-            '/\[\[filter_disqus(?::([^\]]*))?\]\]/i',
-            function ($matches) use ($pagename) {
-                $segment = isset($matches[1]) ? trim($matches[1]) : '';
-                $threadname = $segment !== '' ? $pagename . ' (' . $segment . ')' : $pagename;
-                return '{embeddiscussion:' . $threadname . '}';
-            },
-            $text
-        );
+        if ($disqusenabled) {
+            $text = preg_replace_callback(
+                '/\[\[filter_disqus(?::([^\]]*))?\]\]/i',
+                function ($matches) use ($pagename) {
+                    $segment = isset($matches[1]) ? trim($matches[1]) : '';
+                    $threadname = $segment !== '' ? $pagename . ' (' . $segment . ')' : $pagename;
+                    return '{embeddiscussion:' . $threadname . '}';
+                },
+                $text
+            );
+        }
 
-        $text = preg_replace_callback(
-            '/\{comments\}/i',
-            function () use ($pagename) {
-                return '{embeddiscussion:' . $pagename . '}';
-            },
-            $text
-        );
+        if ($commentsenabled) {
+            $text = preg_replace_callback(
+                '/\{comments\}/i',
+                function () use ($pagename) {
+                    return '{embeddiscussion:' . $pagename . '}';
+                },
+                $text
+            );
+        }
 
         return $text;
+    }
+
+    /**
+     * Whether rewriting of [[filter_disqus]] legacy tokens is enabled.
+     *
+     * @return bool
+     */
+    protected static function legacy_disqus_tokens_enabled(): bool {
+        return !empty(get_config('filter_embeddiscussion', 'legacyfilterdisqus'));
+    }
+
+    /**
+     * Whether rewriting of {comments} legacy tokens is enabled.
+     *
+     * @return bool
+     */
+    protected static function legacy_comments_tokens_enabled(): bool {
+        return !empty(get_config('filter_embeddiscussion', 'legacycomments'));
     }
 
     /**

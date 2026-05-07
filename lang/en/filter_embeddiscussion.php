@@ -91,7 +91,15 @@ $string['setting_adjectives_desc'] = 'Comma-separated list of adjectives used as
 $string['setting_animals'] = 'Animal (word two)';
 $string['setting_animals_default'] = 'Ibis,Kestrel,Heron,Lynx,Merlin';
 $string['setting_animals_desc'] = 'Comma-separated list of animals used as the second word of an anonymous handle.';
+$string['setting_legacycomments'] = 'Use filter for legacy {comments} tokens';
+$string['setting_legacycomments_desc'] = 'If enabled, {comments} is converted to {embeddiscussion:<page name>} during filtering.';
+$string['setting_legacyfilterdisqus'] = 'Use filter for legacy [[filter_disqus]] tokens';
+$string['setting_legacyfilterdisqus_desc'] = 'If enabled, [[filter_disqus]] and [[filter_disqus:<url_segment>]] are converted ' .
+    'to {embeddiscussion:<page name>} during filtering.';
 $string['settings_general'] = 'Anonymous handles';
+$string['settings_legacytokens'] = 'Use filter for legacy tokens';
+$string['settings_legacytokens_desc'] = 'Legacy token conversion is disabled by default. Enable each legacy syntax separately if ' .
+    'you need backward compatibility.';
 $string['startthediscussion'] = 'Start the discussion…';
 $string['threadcontext'] = 'Location';
 $string['threadlastpost'] = 'Last post';

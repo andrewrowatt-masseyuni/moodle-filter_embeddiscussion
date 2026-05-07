@@ -26,6 +26,17 @@ namespace filter_embeddiscussion;
  * @covers \filter_embeddiscussion\text_filter
  */
 final class text_filter_test extends \advanced_testcase {
+    /**
+     * Configure legacy token conversion settings for this test.
+     *
+     * @param bool $disqusenabled whether [[filter_disqus]] conversion is enabled
+     * @param bool $commentsenabled whether {comments} conversion is enabled
+     */
+    protected function configure_legacy_token_handling(bool $disqusenabled, bool $commentsenabled): void {
+        set_config('legacyfilterdisqus', $disqusenabled ? 1 : 0, 'filter_embeddiscussion');
+        set_config('legacycomments', $commentsenabled ? 1 : 0, 'filter_embeddiscussion');
+    }
+
     public function test_filter_no_token_passes_through(): void {
         $this->resetAfterTest();
         $context = \context_system::instance();
@@ -276,6 +287,7 @@ final class text_filter_test extends \advanced_testcase {
     public function test_convert_legacy_tokens_basic_disqus(): void {
         global $PAGE, $SITE;
         $this->resetAfterTest();
+        $this->configure_legacy_token_handling(true, false);
         $PAGE->set_title('Course: Course 1', false);
         $SITE->fullname = 'Acceptance test site';
         $SITE->shortname = 'Acceptance test site';
@@ -286,6 +298,7 @@ final class text_filter_test extends \advanced_testcase {
     public function test_convert_legacy_tokens_disqus_with_segment(): void {
         global $PAGE, $SITE;
         $this->resetAfterTest();
+        $this->configure_legacy_token_handling(true, false);
         $PAGE->set_title('Course: Course 1', false);
         $SITE->fullname = 'Acceptance test site';
         $SITE->shortname = 'Acceptance test site';
@@ -296,6 +309,7 @@ final class text_filter_test extends \advanced_testcase {
     public function test_convert_legacy_tokens_comments(): void {
         global $PAGE, $SITE;
         $this->resetAfterTest();
+        $this->configure_legacy_token_handling(false, true);
         $PAGE->set_title('Course: Course 1', false);
         $SITE->fullname = 'Acceptance test site';
         $SITE->shortname = 'Acceptance test site';
@@ -306,6 +320,7 @@ final class text_filter_test extends \advanced_testcase {
     public function test_convert_legacy_tokens_strips_site_suffix(): void {
         global $PAGE, $SITE;
         $this->resetAfterTest();
+        $this->configure_legacy_token_handling(true, false);
         $PAGE->set_title('Celebrating Cultures | Interesting cities | Mount Orange', false);
         $SITE->fullname = 'Mount Orange';
         $SITE->shortname = 'mountorange';
@@ -316,14 +331,49 @@ final class text_filter_test extends \advanced_testcase {
     public function test_convert_legacy_tokens_leaves_text_when_title_empty(): void {
         global $PAGE;
         $this->resetAfterTest();
+        $this->configure_legacy_token_handling(true, true);
         $PAGE->set_title('', false);
         $input = 'Untouched [[filter_disqus]] {comments}';
         $this->assertSame($input, text_filter::convert_legacy_tokens($input));
     }
 
+    public function test_convert_legacy_tokens_leaves_text_when_both_options_disabled(): void {
+        global $PAGE, $SITE;
+        $this->resetAfterTest();
+        $this->configure_legacy_token_handling(false, false);
+        $PAGE->set_title('Course: Course 1', false);
+        $SITE->fullname = 'Acceptance test site';
+        $SITE->shortname = 'Acceptance test site';
+        $input = 'Untouched [[filter_disqus]] {comments}';
+        $this->assertSame($input, text_filter::convert_legacy_tokens($input));
+    }
+
+    public function test_convert_legacy_tokens_handles_disqus_only_when_enabled(): void {
+        global $PAGE, $SITE;
+        $this->resetAfterTest();
+        $this->configure_legacy_token_handling(true, false);
+        $PAGE->set_title('Course: Course 1', false);
+        $SITE->fullname = 'Acceptance test site';
+        $SITE->shortname = 'Acceptance test site';
+        $input = 'A [[filter_disqus]] B {comments}';
+        $this->assertSame('A {embeddiscussion:Course: Course 1} B {comments}', text_filter::convert_legacy_tokens($input));
+    }
+
+    public function test_convert_legacy_tokens_handles_comments_only_when_enabled(): void {
+        global $PAGE, $SITE;
+        $this->resetAfterTest();
+        $this->configure_legacy_token_handling(false, true);
+        $PAGE->set_title('Course: Course 1', false);
+        $SITE->fullname = 'Acceptance test site';
+        $SITE->shortname = 'Acceptance test site';
+        $input = 'A [[filter_disqus]] B {comments}';
+        $this->assertSame('A [[filter_disqus]] B {embeddiscussion:Course: Course 1}', text_filter::convert_legacy_tokens($input));
+    }
+
     public function test_filter_renders_legacy_disqus_token(): void {
         global $PAGE, $SITE;
         $this->resetAfterTest();
+        $this->configure_legacy_token_handling(true, false);
         $PAGE->set_title('Course: Course 1', false);
         $SITE->fullname = 'Acceptance test site';
         $SITE->shortname = 'Acceptance test site';
@@ -339,6 +389,7 @@ final class text_filter_test extends \advanced_testcase {
     public function test_filter_renders_legacy_disqus_segment_token(): void {
         global $PAGE, $SITE;
         $this->resetAfterTest();
+        $this->configure_legacy_token_handling(true, false);
         $PAGE->set_title('Course: Course 1', false);
         $SITE->fullname = 'Acceptance test site';
         $SITE->shortname = 'Acceptance test site';
@@ -353,6 +404,7 @@ final class text_filter_test extends \advanced_testcase {
     public function test_filter_renders_legacy_comments_token(): void {
         global $PAGE, $SITE;
         $this->resetAfterTest();
+        $this->configure_legacy_token_handling(false, true);
         $PAGE->set_title('Course: Course 1', false);
         $SITE->fullname = 'Acceptance test site';
         $SITE->shortname = 'Acceptance test site';
@@ -362,6 +414,19 @@ final class text_filter_test extends \advanced_testcase {
         $thread = manager::find_thread('Course: Course 1', $context->id);
         $this->assertNotNull($thread);
         $this->assertStringContainsString('data-threadid="' . (int)$thread->id . '"', $output);
+    }
+
+    public function test_filter_leaves_legacy_tokens_untouched_by_default(): void {
+        global $PAGE, $SITE;
+        $this->resetAfterTest();
+        $PAGE->set_title('Course: Course 1', false);
+        $SITE->fullname = 'Acceptance test site';
+        $SITE->shortname = 'Acceptance test site';
+        $context = \context_system::instance();
+        $filter = new text_filter($context, []);
+        $input = 'Before [[filter_disqus]] and {comments} after';
+        $output = $filter->filter($input);
+        $this->assertSame($input, $output);
     }
 
     /**
