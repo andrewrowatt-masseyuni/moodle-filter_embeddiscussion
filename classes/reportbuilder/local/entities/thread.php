@@ -81,7 +81,7 @@ class thread extends base {
         ))
             ->add_joins($this->get_joins())
             ->set_type(column::TYPE_TEXT)
-            ->add_fields("{$alias}.id, {$alias}.name")
+            ->add_fields("{$alias}.id, {$alias}.idnumber")
             ->set_is_sortable(true)
             ->set_callback(static function (?string $value, \stdClass $row): string {
                 if ($value === null) {
@@ -174,7 +174,7 @@ class thread extends base {
             'name',
             new lang_string('threadname', 'filter_embeddiscussion'),
             $this->get_entity_name(),
-            "{$alias}.name"
+            "{$alias}.idnumber"
         ))->add_joins($this->get_joins());
 
         $filters[] = (new filter(

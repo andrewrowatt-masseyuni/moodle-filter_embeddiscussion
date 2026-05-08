@@ -62,7 +62,7 @@ $functions = [
     ],
     'filter_embeddiscussion_get_dashboard' => [
         'classname' => 'filter_embeddiscussion\external\get_dashboard',
-        'description' => 'List embedded discussion posts in a course since the user\'s last visit.',
+        'description' => 'List embedded discussion posts in a course (latest first) with unread markers.',
         'type' => 'read',
         'ajax' => true,
         'loginrequired' => true,

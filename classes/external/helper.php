@@ -67,12 +67,15 @@ class helper {
     public static function dashboard_post_structure(): external_single_structure {
         return new external_single_structure([
             'id' => new external_value(PARAM_INT, 'Post id'),
+            'threadid' => new external_value(PARAM_INT, 'Thread id'),
+            'threadname' => new external_value(PARAM_TEXT, 'Thread page title'),
             'content' => new external_value(PARAM_RAW, 'Sanitised HTML content'),
             'deleted' => new external_value(PARAM_BOOL, 'Whether the post is deleted'),
             'edited' => new external_value(PARAM_BOOL, 'Whether the post has been edited'),
             'timecreated' => new external_value(PARAM_INT, 'Unix timestamp when created'),
             'timecreatediso' => new external_value(PARAM_TEXT, 'Localised date/time'),
             'timecreatedrelative' => new external_value(PARAM_TEXT, 'Relative time string'),
+            'isunread' => new external_value(PARAM_BOOL, 'True when the post is newer than last course access'),
             'authorname' => new external_value(PARAM_TEXT, 'Display name of author'),
             'authorhandle' => new external_value(PARAM_TEXT, 'Anonymous handle, if any'),
             'authorrole' => new external_value(PARAM_TEXT, 'Author role label, if non-student'),
@@ -93,17 +96,18 @@ class helper {
             'lastaccess' => new external_value(PARAM_INT, 'Unix timestamp of last course access'),
             'lastaccessiso' => new external_value(PARAM_TEXT, 'Localised date/time of last access'),
             'lastaccessrelative' => new external_value(PARAM_TEXT, 'Relative time of last access'),
-            'hasitems' => new external_value(PARAM_BOOL, 'True if there is at least one new post'),
+            'hasitems' => new external_value(PARAM_BOOL, 'True if there is at least one visible post'),
             'neverbefore' => new external_value(PARAM_BOOL, 'True if this is the first course visit'),
-            'threadcount' => new external_value(PARAM_INT, 'Number of threads with new activity'),
-            'postcount' => new external_value(PARAM_INT, 'Total number of new posts'),
+            'threadcount' => new external_value(PARAM_INT, 'Number of visible threads with posts'),
+            'postcount' => new external_value(PARAM_INT, 'Total number of visible posts'),
             'threads' => new external_multiple_structure(new external_single_structure([
                 'threadid' => new external_value(PARAM_INT, 'Thread id'),
-                'name' => new external_value(PARAM_TEXT, 'Thread name'),
+                'name' => new external_value(PARAM_TEXT, 'Thread page title'),
                 'pageurl' => new external_value(PARAM_RAW, 'Host page URL', VALUE_OPTIONAL),
-                'postcount' => new external_value(PARAM_INT, 'New posts in this thread'),
+                'postcount' => new external_value(PARAM_INT, 'Visible posts in this thread'),
                 'posts' => new external_multiple_structure(self::dashboard_post_structure()),
             ])),
+            'posts' => new external_multiple_structure(self::dashboard_post_structure()),
         ]);
     }
 
@@ -115,7 +119,7 @@ class helper {
     public static function thread_structure(): external_single_structure {
         return new external_single_structure([
             'threadid' => new external_value(PARAM_INT, 'Thread id'),
-            'name' => new external_value(PARAM_TEXT, 'Thread name'),
+            'name' => new external_value(PARAM_TEXT, 'Thread idnumber'),
             'anonymous' => new external_value(PARAM_BOOL, 'Anonymous mode enabled'),
             'currentuserisanonymous' => new external_value(
                 PARAM_BOOL,

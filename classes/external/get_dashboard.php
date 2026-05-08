@@ -22,7 +22,7 @@ use core_external\external_value;
 use filter_embeddiscussion\manager;
 
 /**
- * Return new posts in a course since the user's last visit.
+ * Return latest visible posts in a course, with unread flags since last visit.
  *
  * Visibility is enforced inside manager::get_dashboard_view via
  * cm_info::uservisible, which honours restrict-access conditions.

@@ -31,16 +31,16 @@ class manager {
     const ALLOWED_TAGS = '<p><br><b><strong><i><em><u><a><img><mark><ul><ol><li><blockquote><span>';
 
     /**
-     * Get an existing thread by name+context, or null.
+     * Get an existing thread by idnumber+context, or null.
      *
-     * @param string $name
+     * @param string $idnumber
      * @param int $contextid
      * @return \stdClass|null
      */
-    public static function find_thread(string $name, int $contextid): ?\stdClass {
+    public static function find_thread(string $idnumber, int $contextid): ?\stdClass {
         global $DB;
-        $name = trim($name);
-        $hash = sha1($name);
+        $idnumber = trim($idnumber);
+        $hash = sha1($idnumber);
         $record = $DB->get_record('filter_embeddiscussion_thread', [
             'namehash' => $hash,
             'contextid' => $contextid,
@@ -49,30 +49,42 @@ class manager {
     }
 
     /**
-     * Get or create the thread for a name+context. Creation is logged.
+     * Get or create the thread for an idnumber+context. Creation is logged.
      *
-     * @param string $name
+     * @param string $idnumber
      * @param \context $context
      * @param string|null $pageurl URL of the page hosting the thread; refreshed on each
      *                             call so the stored value tracks the current location.
+     * @param string|null $pagetitle page title at token-processing time; refreshed
+     *                               on each call when available.
      * @return \stdClass
      */
     public static function get_or_create_thread(
-        string $name,
+        string $idnumber,
         \context $context,
-        ?string $pageurl = null
+        ?string $pageurl = null,
+        ?string $pagetitle = null
     ): \stdClass {
-        global $DB, $USER;
+        global $DB;
 
-        $name = trim($name);
-        if ($name === '') {
-            throw new \invalid_parameter_exception('Thread name cannot be empty');
+        $idnumber = trim($idnumber);
+        if ($idnumber === '') {
+            throw new \invalid_parameter_exception('Thread idnumber cannot be empty');
         }
+        $pagetitle = trim((string)$pagetitle);
 
-        $existing = self::find_thread($name, $context->id);
+        $existing = self::find_thread($idnumber, $context->id);
         if ($existing) {
+            $changed = false;
             if ($pageurl !== null && $pageurl !== '' && (string)($existing->pageurl ?? '') !== $pageurl) {
                 $existing->pageurl = $pageurl;
+                $changed = true;
+            }
+            if ($pagetitle !== '' && (string)($existing->pagetitle ?? '') !== $pagetitle) {
+                $existing->pagetitle = $pagetitle;
+                $changed = true;
+            }
+            if ($changed) {
                 $existing->timemodified = time();
                 $DB->update_record('filter_embeddiscussion_thread', $existing);
             }
@@ -90,8 +102,9 @@ class manager {
         $masterlistsize = max(count(handles::master_list()), 1);
 
         $record = (object)[
-            'name' => $name,
-            'namehash' => sha1($name),
+            'idnumber' => $idnumber,
+            'pagetitle' => ($pagetitle !== '') ? $pagetitle : $idnumber,
+            'namehash' => sha1($idnumber),
             'contextid' => $context->id,
             'courseid' => $courseid,
             'anonymous' => 0,
@@ -106,7 +119,7 @@ class manager {
             $record->id = $DB->insert_record('filter_embeddiscussion_thread', $record);
         } catch (\dml_write_exception $e) {
             // Race condition: re-fetch the row created by the racing request.
-            $existing = self::find_thread($name, $context->id);
+            $existing = self::find_thread($idnumber, $context->id);
             if ($existing) {
                 return $existing;
             }
@@ -514,7 +527,7 @@ class manager {
 
         return [
             'threadid' => (int)$thread->id,
-            'name' => $thread->name,
+            'name' => (string)$thread->idnumber,
             'anonymous' => (bool)$thread->anonymous,
             'currentuserisanonymous' => $currentuserisanonymous,
             'locked' => (bool)$thread->locked,
@@ -608,7 +621,7 @@ class manager {
             'edited' => (bool)$post->edited,
             'timecreated' => (int)$post->timecreated,
             'timecreatediso' => userdate($post->timecreated, get_string('strftimedatetime', 'langconfig')),
-            'timecreatedrelative' => format_time(time() - $post->timecreated) . ' ' . get_string('ago','filter_embeddiscussion'),
+            'timecreatedrelative' => format_time(time() - $post->timecreated) . ' ' . get_string('ago', 'filter_embeddiscussion'),
             'authorname' => $authorname,
             'authorhandle' => $handle,
             'authorrole' => $rolelabel,
@@ -636,9 +649,8 @@ class manager {
     }
 
     /**
-     * Build the dashboard payload: posts created since the user's last visit
-     * to the course, grouped by thread, scoped to threads in modules the user
-     * can see (cm_info::uservisible enforces restrict-access conditions).
+     * Build the course feed payload: all posts in visible-module threads,
+     * newest-first, with unread markers for posts newer than last access.
      *
      * @param int $courseid
      * @param int $userid viewing user
@@ -673,26 +685,33 @@ class manager {
             'filter_embeddiscussion_thread',
             "contextid $insql",
             $inparams,
-            'name ASC'
+            'pagetitle ASC, idnumber ASC'
         );
 
         $threadsout = [];
-        $totalposts = 0;
+        $postsout = [];
         foreach ($threads as $thread) {
             $entry = self::build_dashboard_thread_entry($thread, $lastaccess, $renderer);
             if ($entry === null) {
                 continue;
             }
-            $totalposts += $entry['postcount'];
             $threadsout[] = $entry;
+            $postsout = array_merge($postsout, $entry['posts']);
         }
 
-        return self::dashboard_payload($lastaccess, $threadsout, $totalposts);
+        usort($postsout, function (array $a, array $b): int {
+            if ((int)$a['timecreated'] === (int)$b['timecreated']) {
+                return (int)$b['id'] <=> (int)$a['id'];
+            }
+            return (int)$b['timecreated'] <=> (int)$a['timecreated'];
+        });
+
+        return self::dashboard_payload($lastaccess, $threadsout, count($postsout), $postsout);
     }
 
     /**
-     * Build the per-thread payload of new posts since $lastaccess, or null if
-     * the thread has no qualifying posts.
+     * Build the per-thread payload of all posts, or null if the thread has no
+     * posts to render.
      *
      * @param \stdClass $thread
      * @param int $lastaccess
@@ -708,8 +727,8 @@ class manager {
 
         $posts = $DB->get_records_select(
             'filter_embeddiscussion_post',
-            'threadid = :tid AND deleted = 0 AND timecreated > :since',
-            ['tid' => (int)$thread->id, 'since' => $lastaccess],
+            'threadid = :tid',
+            ['tid' => (int)$thread->id],
             'timecreated DESC'
         );
         if (empty($posts)) {
@@ -733,11 +752,11 @@ class manager {
                 false,
                 $renderer
             );
-            $postsout[] = self::dashboard_post_from_view($view, (int)$p->id, $pageurl);
+            $postsout[] = self::dashboard_post_from_view($view, $thread, (int)$p->id, $pageurl, $lastaccess);
         }
         return [
             'threadid' => (int)$thread->id,
-            'name' => $thread->name,
+            'name' => self::thread_display_name($thread),
             'pageurl' => $pageurl,
             'postcount' => count($postsout),
             'posts' => $postsout,
@@ -745,14 +764,28 @@ class manager {
     }
 
     /**
+     * Human-facing thread label for read-only views.
+     *
+     * @param \stdClass $thread
+     * @return string
+     */
+    protected static function thread_display_name(\stdClass $thread): string {
+        $pagetitle = trim((string)($thread->pagetitle ?? ''));
+        if ($pagetitle !== '') {
+            return $pagetitle;
+        }
+        return trim((string)($thread->idnumber ?? ''));
+    }
+
+    /**
      * Empty-state payload used when the user has no visible modules in the
-     * course or no new posts.
+     * course or no visible posts.
      *
      * @param int $lastaccess
      * @return array
      */
     protected static function empty_dashboard_payload(int $lastaccess): array {
-        return self::dashboard_payload($lastaccess, [], 0);
+        return self::dashboard_payload($lastaccess, [], 0, []);
     }
 
     /**
@@ -761,9 +794,10 @@ class manager {
      * @param int $lastaccess
      * @param array $threads
      * @param int $totalposts
+     * @param array $posts
      * @return array
      */
-    protected static function dashboard_payload(int $lastaccess, array $threads, int $totalposts): array {
+    protected static function dashboard_payload(int $lastaccess, array $threads, int $totalposts, array $posts): array {
         return [
             'lastaccess' => $lastaccess,
             'lastaccessiso' => $lastaccess
@@ -777,6 +811,7 @@ class manager {
             'threadcount' => count($threads),
             'postcount' => $totalposts,
             'threads' => $threads,
+            'posts' => $posts,
         ];
     }
 
@@ -787,11 +822,19 @@ class manager {
      * links back to the post in its hosting page.
      *
      * @param array $view a row produced by self::build_post_view
+     * @param \stdClass $thread thread record
      * @param int $postid the post's id (used to compose the anchor)
      * @param string $pageurl the host page URL stored on the thread
+     * @param int $lastaccess the viewer's last course access timestamp
      * @return array
      */
-    protected static function dashboard_post_from_view(array $view, int $postid, string $pageurl): array {
+    protected static function dashboard_post_from_view(
+        array $view,
+        \stdClass $thread,
+        int $postid,
+        string $pageurl,
+        int $lastaccess
+    ): array {
         unset(
             $view['parentid'],
             $view['votes_up'],
@@ -801,6 +844,9 @@ class manager {
             $view['candelete'],
             $view['canreply']
         );
+        $view['threadid'] = (int)$thread->id;
+        $view['threadname'] = self::thread_display_name($thread);
+        $view['isunread'] = ((int)$view['timecreated'] > $lastaccess);
         $view['posturl'] = ($pageurl !== '') ? $pageurl . '#embeddisc-post-' . $postid : '';
         return $view;
     }

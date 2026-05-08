@@ -26,6 +26,17 @@ namespace filter_embeddiscussion;
  * @covers \filter_embeddiscussion\text_filter
  */
 final class text_filter_test extends \advanced_testcase {
+    /**
+     * Configure legacy token conversion settings for this test.
+     *
+     * @param bool $disqusenabled whether [[filter_disqus]] conversion is enabled
+     * @param bool $commentsenabled whether {comments} conversion is enabled
+     */
+    protected function configure_legacy_token_handling(bool $disqusenabled, bool $commentsenabled): void {
+        set_config('legacyfilterdisqus', $disqusenabled ? 1 : 0, 'filter_embeddiscussion');
+        set_config('legacycomments', $commentsenabled ? 1 : 0, 'filter_embeddiscussion');
+    }
+
     public function test_filter_no_token_passes_through(): void {
         $this->resetAfterTest();
         $context = \context_system::instance();
@@ -62,6 +73,20 @@ final class text_filter_test extends \advanced_testcase {
         $this->assertStringContainsString('data-threadid="' . (int)$thread->id . '"', $output);
     }
 
+    public function test_filter_stores_pagetitle_for_explicit_idnumber(): void {
+        global $PAGE, $SITE;
+        $this->resetAfterTest();
+        $PAGE->set_title('Lesson 2 | Acceptance test site', false);
+        $SITE->fullname = 'Acceptance test site';
+        $SITE->shortname = 'Acceptance test site';
+        $context = \context_system::instance();
+        $filter = new text_filter($context, []);
+        $filter->filter('{embeddiscussion:lesson-2}');
+        $thread = manager::find_thread('lesson-2', $context->id);
+        $this->assertNotNull($thread);
+        $this->assertSame('Lesson 2', (string)$thread->pagetitle);
+    }
+
     public function test_filter_handles_multiple_tokens(): void {
         $this->resetAfterTest();
         $context = \context_system::instance();
@@ -74,6 +99,18 @@ final class text_filter_test extends \advanced_testcase {
         $this->assertNotNull($threadb);
         $this->assertStringContainsString('data-threadid="' . (int)$threada->id . '"', $output);
         $this->assertStringContainsString('data-threadid="' . (int)$threadb->id . '"', $output);
+    }
+
+    public function test_filter_renders_latestposts_placeholder_in_course_context(): void {
+        global $PAGE;
+        $this->resetAfterTest();
+        $course = $this->getDataGenerator()->create_course();
+        $PAGE->set_course($course);
+        $context = \context_course::instance($course->id);
+        $filter = new text_filter($context, []);
+        $output = $filter->filter('{embeddeddiscussion:latestposts}');
+        $this->assertStringContainsString('data-region="filter-embeddiscussion-dashboard"', $output);
+        $this->assertStringContainsString('data-courseid="' . (int)$course->id . '"', $output);
     }
 
     public function test_filter_ignores_empty_name(): void {
@@ -93,8 +130,9 @@ final class text_filter_test extends \advanced_testcase {
         $context = \context_system::instance();
         $filter = new text_filter($context, []);
         $output = $filter->filter('Before {embeddiscussion} after');
-        $thread = manager::find_thread('Course: Course 1', $context->id);
+        $thread = manager::find_thread('course-course-1', $context->id);
         $this->assertNotNull($thread);
+        $this->assertSame('Course: Course 1', (string)$thread->pagetitle);
         $this->assertSame(0, (int)$thread->anonymous);
         $this->assertSame(0, (int)$thread->locked);
         $this->assertStringContainsString('data-region="filter-embeddiscussion"', $output);
@@ -110,8 +148,9 @@ final class text_filter_test extends \advanced_testcase {
         $context = \context_system::instance();
         $filter = new text_filter($context, []);
         $output = $filter->filter('{embeddiscussion,anonymous,locked}');
-        $thread = manager::find_thread('Course: Course 1', $context->id);
+        $thread = manager::find_thread('course-course-1', $context->id);
         $this->assertNotNull($thread);
+        $this->assertSame('Course: Course 1', (string)$thread->pagetitle);
         $this->assertSame(1, (int)$thread->anonymous);
         $this->assertSame(1, (int)$thread->locked);
         $this->assertStringContainsString('data-threadid="' . (int)$thread->id . '"', $output);
@@ -126,8 +165,9 @@ final class text_filter_test extends \advanced_testcase {
         $context = \context_system::instance();
         $filter = new text_filter($context, []);
         $output = $filter->filter('{embeddeddiscussion}');
-        $thread = manager::find_thread('Course: Course 1', $context->id);
+        $thread = manager::find_thread('course-course-1', $context->id);
         $this->assertNotNull($thread);
+        $this->assertSame('Course: Course 1', (string)$thread->pagetitle);
         $this->assertStringContainsString('data-threadid="' . (int)$thread->id . '"', $output);
     }
 
@@ -150,8 +190,9 @@ final class text_filter_test extends \advanced_testcase {
         $context = \context_system::instance();
         $filter = new text_filter($context, []);
         $output = $filter->filter('{embeddiscussion:anon}');
-        $thread = manager::find_thread('Course: Course 1', $context->id);
+        $thread = manager::find_thread('course-course-1', $context->id);
         $this->assertNotNull($thread);
+        $this->assertSame('Course: Course 1', (string)$thread->pagetitle);
         $this->assertSame(1, (int)$thread->anonymous);
         $this->assertSame(0, (int)$thread->locked);
         $this->assertStringContainsString('data-threadid="' . (int)$thread->id . '"', $output);
@@ -166,8 +207,9 @@ final class text_filter_test extends \advanced_testcase {
         $context = \context_system::instance();
         $filter = new text_filter($context, []);
         $output = $filter->filter('{embeddiscussion:locked,anon}');
-        $thread = manager::find_thread('Course: Course 1', $context->id);
+        $thread = manager::find_thread('course-course-1', $context->id);
         $this->assertNotNull($thread);
+        $this->assertSame('Course: Course 1', (string)$thread->pagetitle);
         $this->assertSame(1, (int)$thread->anonymous);
         $this->assertSame(1, (int)$thread->locked);
         $this->assertStringContainsString('data-threadid="' . (int)$thread->id . '"', $output);
@@ -264,6 +306,7 @@ final class text_filter_test extends \advanced_testcase {
     public function test_convert_legacy_tokens_basic_disqus(): void {
         global $PAGE, $SITE;
         $this->resetAfterTest();
+        $this->configure_legacy_token_handling(true, false);
         $PAGE->set_title('Course: Course 1', false);
         $SITE->fullname = 'Acceptance test site';
         $SITE->shortname = 'Acceptance test site';
@@ -274,6 +317,7 @@ final class text_filter_test extends \advanced_testcase {
     public function test_convert_legacy_tokens_disqus_with_segment(): void {
         global $PAGE, $SITE;
         $this->resetAfterTest();
+        $this->configure_legacy_token_handling(true, false);
         $PAGE->set_title('Course: Course 1', false);
         $SITE->fullname = 'Acceptance test site';
         $SITE->shortname = 'Acceptance test site';
@@ -284,6 +328,7 @@ final class text_filter_test extends \advanced_testcase {
     public function test_convert_legacy_tokens_comments(): void {
         global $PAGE, $SITE;
         $this->resetAfterTest();
+        $this->configure_legacy_token_handling(false, true);
         $PAGE->set_title('Course: Course 1', false);
         $SITE->fullname = 'Acceptance test site';
         $SITE->shortname = 'Acceptance test site';
@@ -294,6 +339,7 @@ final class text_filter_test extends \advanced_testcase {
     public function test_convert_legacy_tokens_strips_site_suffix(): void {
         global $PAGE, $SITE;
         $this->resetAfterTest();
+        $this->configure_legacy_token_handling(true, false);
         $PAGE->set_title('Celebrating Cultures | Interesting cities | Mount Orange', false);
         $SITE->fullname = 'Mount Orange';
         $SITE->shortname = 'mountorange';
@@ -304,14 +350,49 @@ final class text_filter_test extends \advanced_testcase {
     public function test_convert_legacy_tokens_leaves_text_when_title_empty(): void {
         global $PAGE;
         $this->resetAfterTest();
+        $this->configure_legacy_token_handling(true, true);
         $PAGE->set_title('', false);
         $input = 'Untouched [[filter_disqus]] {comments}';
         $this->assertSame($input, text_filter::convert_legacy_tokens($input));
     }
 
+    public function test_convert_legacy_tokens_leaves_text_when_both_options_disabled(): void {
+        global $PAGE, $SITE;
+        $this->resetAfterTest();
+        $this->configure_legacy_token_handling(false, false);
+        $PAGE->set_title('Course: Course 1', false);
+        $SITE->fullname = 'Acceptance test site';
+        $SITE->shortname = 'Acceptance test site';
+        $input = 'Untouched [[filter_disqus]] {comments}';
+        $this->assertSame($input, text_filter::convert_legacy_tokens($input));
+    }
+
+    public function test_convert_legacy_tokens_handles_disqus_only_when_enabled(): void {
+        global $PAGE, $SITE;
+        $this->resetAfterTest();
+        $this->configure_legacy_token_handling(true, false);
+        $PAGE->set_title('Course: Course 1', false);
+        $SITE->fullname = 'Acceptance test site';
+        $SITE->shortname = 'Acceptance test site';
+        $input = 'A [[filter_disqus]] B {comments}';
+        $this->assertSame('A {embeddiscussion:Course: Course 1} B {comments}', text_filter::convert_legacy_tokens($input));
+    }
+
+    public function test_convert_legacy_tokens_handles_comments_only_when_enabled(): void {
+        global $PAGE, $SITE;
+        $this->resetAfterTest();
+        $this->configure_legacy_token_handling(false, true);
+        $PAGE->set_title('Course: Course 1', false);
+        $SITE->fullname = 'Acceptance test site';
+        $SITE->shortname = 'Acceptance test site';
+        $input = 'A [[filter_disqus]] B {comments}';
+        $this->assertSame('A [[filter_disqus]] B {embeddiscussion:Course: Course 1}', text_filter::convert_legacy_tokens($input));
+    }
+
     public function test_filter_renders_legacy_disqus_token(): void {
         global $PAGE, $SITE;
         $this->resetAfterTest();
+        $this->configure_legacy_token_handling(true, false);
         $PAGE->set_title('Course: Course 1', false);
         $SITE->fullname = 'Acceptance test site';
         $SITE->shortname = 'Acceptance test site';
@@ -327,6 +408,7 @@ final class text_filter_test extends \advanced_testcase {
     public function test_filter_renders_legacy_disqus_segment_token(): void {
         global $PAGE, $SITE;
         $this->resetAfterTest();
+        $this->configure_legacy_token_handling(true, false);
         $PAGE->set_title('Course: Course 1', false);
         $SITE->fullname = 'Acceptance test site';
         $SITE->shortname = 'Acceptance test site';
@@ -341,6 +423,7 @@ final class text_filter_test extends \advanced_testcase {
     public function test_filter_renders_legacy_comments_token(): void {
         global $PAGE, $SITE;
         $this->resetAfterTest();
+        $this->configure_legacy_token_handling(false, true);
         $PAGE->set_title('Course: Course 1', false);
         $SITE->fullname = 'Acceptance test site';
         $SITE->shortname = 'Acceptance test site';
@@ -350,6 +433,19 @@ final class text_filter_test extends \advanced_testcase {
         $thread = manager::find_thread('Course: Course 1', $context->id);
         $this->assertNotNull($thread);
         $this->assertStringContainsString('data-threadid="' . (int)$thread->id . '"', $output);
+    }
+
+    public function test_filter_leaves_legacy_tokens_untouched_by_default(): void {
+        global $PAGE, $SITE;
+        $this->resetAfterTest();
+        $PAGE->set_title('Course: Course 1', false);
+        $SITE->fullname = 'Acceptance test site';
+        $SITE->shortname = 'Acceptance test site';
+        $context = \context_system::instance();
+        $filter = new text_filter($context, []);
+        $input = 'Before [[filter_disqus]] and {comments} after';
+        $output = $filter->filter($input);
+        $this->assertSame($input, $output);
     }
 
     /**

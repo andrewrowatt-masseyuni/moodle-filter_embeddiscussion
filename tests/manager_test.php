@@ -160,4 +160,70 @@ final class manager_test extends \advanced_testcase {
         }
         $this->assertTrue($found, 'Expected thread_initialised event was not triggered.');
     }
+
+    public function test_get_dashboard_view_returns_latest_posts_and_unread_markers(): void {
+        global $DB;
+        $this->resetAfterTest();
+        $course = $this->getDataGenerator()->create_course();
+        $student = $this->getDataGenerator()->create_and_enrol($course, 'student');
+        $teacher = $this->getDataGenerator()->create_and_enrol($course, 'editingteacher');
+
+        $visiblelabel = $this->getDataGenerator()->create_module('label', [
+            'course' => $course->id,
+            'name' => 'Visible label',
+            'intro' => '{embeddeddiscussion:visible-thread}',
+            'visible' => 1,
+        ]);
+        $hiddenlabel = $this->getDataGenerator()->create_module('label', [
+            'course' => $course->id,
+            'name' => 'Hidden label',
+            'intro' => '{embeddeddiscussion:hidden-thread}',
+            'visible' => 0,
+        ]);
+
+        $visiblecontext = \context_module::instance($visiblelabel->cmid);
+        $hiddencontext = \context_module::instance($hiddenlabel->cmid);
+        $visiblethread = manager::get_or_create_thread(
+            'visible-thread',
+            $visiblecontext,
+            '/mod/label/view.php?id=' . $visiblelabel->cmid,
+            'Visible label'
+        );
+        $hiddenthread = manager::get_or_create_thread(
+            'hidden-thread',
+            $hiddencontext,
+            '/mod/label/view.php?id=' . $hiddenlabel->cmid,
+            'Hidden label'
+        );
+
+        $this->setUser($teacher);
+        $oldpost = manager::create_post($visiblethread, $visiblecontext, 0, 'Old visible post', $teacher->id);
+        $newpost = manager::create_post($visiblethread, $visiblecontext, 0, 'New visible post', $teacher->id);
+        manager::create_post($hiddenthread, $hiddencontext, 0, 'Hidden post', $teacher->id);
+
+        $now = time();
+        $lastaccess = $now - 100;
+        $DB->set_field('filter_embeddiscussion_post', 'timecreated', $lastaccess - 50, ['id' => $oldpost->id]);
+        $DB->set_field('filter_embeddiscussion_post', 'timecreated', $lastaccess + 50, ['id' => $newpost->id]);
+        $DB->set_field('filter_embeddiscussion_post', 'timemodified', $lastaccess - 50, ['id' => $oldpost->id]);
+        $DB->set_field('filter_embeddiscussion_post', 'timemodified', $lastaccess + 50, ['id' => $newpost->id]);
+        $DB->insert_record('user_lastaccess', (object)[
+            'userid' => $student->id,
+            'courseid' => $course->id,
+            'timeaccess' => $lastaccess,
+        ]);
+
+        $this->setUser($student);
+        $view = manager::get_dashboard_view((int)$course->id, (int)$student->id);
+
+        $this->assertSame(2, $view['postcount']);
+        $this->assertCount(2, $view['posts']);
+        $this->assertSame((int)$newpost->id, (int)$view['posts'][0]['id']);
+        $this->assertSame((int)$oldpost->id, (int)$view['posts'][1]['id']);
+        $this->assertTrue($view['posts'][0]['isunread']);
+        $this->assertFalse($view['posts'][1]['isunread']);
+        $this->assertSame('Visible label', $view['posts'][0]['threadname']);
+        $this->assertStringContainsString('#embeddisc-post-' . (int)$newpost->id, $view['posts'][0]['posturl']);
+        $this->assertStringNotContainsString('Hidden post', json_encode($view));
+    }
 }

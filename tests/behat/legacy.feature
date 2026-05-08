@@ -18,6 +18,9 @@ Feature: Legacy filter_disqus and {comments} tokens are accepted as drop-in repl
       | user     | course | role           |
       | teacher1 | C1     | editingteacher |
       | student1 | C1     | student        |
+    And the following config values are set as admin:
+      | legacyfilterdisqus | 1 | filter_embeddiscussion |
+      | legacycomments     | 1 | filter_embeddiscussion |
     And the "embeddiscussion" filter is "on"
 
   @javascript

@@ -30,7 +30,7 @@ class filter_embeddiscussion_generator extends component_generator_base {
     /**
      * Create a thread.
      *
-     * Required: name. Optional: courseid (course context), activity
+     * Required: idnumber (or legacy name). Optional: pagetitle, courseid (course context), activity
      * (idnumber or activity name to anchor at module context),
      * anonymous, locked.
      *
@@ -41,12 +41,20 @@ class filter_embeddiscussion_generator extends component_generator_base {
         global $DB;
 
         $record = (array)$record;
-        if (empty($record['name'])) {
-            throw new coding_exception('filter_embeddiscussion thread requires a name');
+        $idnumber = trim((string)($record['idnumber'] ?? $record['name'] ?? ''));
+        if ($idnumber === '') {
+            throw new coding_exception('filter_embeddiscussion thread requires an idnumber');
         }
 
+        $pagetitle = trim((string)($record['pagetitle'] ?? ($record['name'] ?? '')));
+
         $context = $this->resolve_context($record);
-        $thread = \filter_embeddiscussion\manager::get_or_create_thread($record['name'], $context);
+        $thread = \filter_embeddiscussion\manager::get_or_create_thread(
+            $idnumber,
+            $context,
+            null,
+            ($pagetitle !== '') ? $pagetitle : null
+        );
 
         $update = [];
         if (array_key_exists('anonymous', $record)) {
@@ -68,8 +76,8 @@ class filter_embeddiscussion_generator extends component_generator_base {
     /**
      * Create a post in an existing thread.
      *
-     * Required: thread (name), userid, content. Optional: courseid (to disambiguate
-     * threads with the same name across courses), parentid.
+     * Required: thread (idnumber), userid, content. Optional: courseid (to disambiguate
+     * threads with the same idnumber across courses), parentid.
      *
      * @param array|stdClass $record
      * @return stdClass
@@ -112,7 +120,7 @@ class filter_embeddiscussion_generator extends component_generator_base {
     /**
      * Cast a vote on a post.
      *
-     * Required: thread (name), userid, postauthor (username) or postcontent
+     * Required: thread (idnumber), userid, postauthor (username) or postcontent
      * (substring match), direction (1 or -1).
      *
      * @param array|stdClass $record
@@ -215,21 +223,21 @@ class filter_embeddiscussion_generator extends component_generator_base {
     }
 
     /**
-     * Look up a thread by name (and optionally course).
+     * Look up a thread by idnumber (and optionally course).
      *
-     * @param string $name
+     * @param string $idnumber
      * @param int|null $courseid
      * @return \stdClass
      */
-    private function find_thread(string $name, ?int $courseid = null): \stdClass {
+    private function find_thread(string $idnumber, ?int $courseid = null): \stdClass {
         global $DB;
-        $params = ['namehash' => sha1(trim($name))];
+        $params = ['namehash' => sha1(trim($idnumber))];
         if ($courseid) {
             $params['courseid'] = (int)$courseid;
         }
         $thread = $DB->get_record('filter_embeddiscussion_thread', $params);
         if (!$thread) {
-            throw new coding_exception("Thread '$name' not found");
+            throw new coding_exception("Thread '$idnumber' not found");
         }
         return $thread;
     }

@@ -383,3 +383,32 @@
 .embeddisc-threads-table th {
     background: #f6f7f9;
 }
+
+/* --- Latest posts dashboard ---------------------------------------------- */
+.embeddisc-dashboard-thread {
+    margin-bottom: 1rem;
+}
+.embeddisc-dashboard-threadname {
+    margin: 0 0 0.25rem;
+    font-size: 0.95rem;
+}
+a.embeddisc-dashboard-postlink {
+    display: block;
+    /* stylelint-disable-next-line declaration-no-important */
+    color: inherit !important;
+    text-decoration: none;
+}
+
+section.embeddisc-dashboard-thread:hover {
+    border-radius: 0.25em;
+    box-shadow: 0 0 0 10px #fff, 0 0 1rem 10px rgb(0 0 0 / .15);
+}
+
+.embeddisc-dashboard-postlink:hover {
+    text-decoration: none;
+}
+
+.embeddisc-dashboard-post-unread {
+    border-left: 3px solid var(--brand-primary, #0d3d6b);
+    padding-left: 0.5rem;
+}

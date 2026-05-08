@@ -20,7 +20,7 @@ Feature: Embedded discussion dashboard
     And the following "activities" exist:
       | activity | course | name          | intro                              | idnumber |
       | label    | C1     | Visible chat  | {embeddeddiscussion:Visible chat}  | l1       |
-      | label    | C1     | Activity feed | {embeddiscussion:dashboard}        | dash     |
+      | label    | C1     | Activity feed | {embeddiscussion:latestposts}      | dash     |
     # Backdate the student's last visit so posts created next pass the cutoff
     # but the dashboard page-load doesn't bump the timestamp forward (the
     # debounce is 60 seconds in user_accesstime_log).

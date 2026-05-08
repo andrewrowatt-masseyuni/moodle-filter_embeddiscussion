@@ -1,8 +1,9 @@
 {{!
     @template filter_embeddiscussion/dashboard
 
-    Course-level activity dashboard listing posts created since the user's
-    last visit, grouped by thread. Each post is rendered with the same
+    Course-level latest-posts dashboard listing all visible posts in the
+    course, newest first. Posts newer than the user's last visit receive an
+    unread accent. Each post is rendered with the same
     aesthetic as filter_embeddiscussion/post but with no compose / vote /
     edit / reply controls and is wrapped in a link back to the post in
     its hosting page.
@@ -15,16 +16,19 @@
     * neverbefore (bool)
     * threadcount (int)
     * postcount (int)
-    * threads (array of {threadid, name, pageurl, postcount, posts[]})
+    * posts (array)
 
-    Each post in posts[] has:
+    Each item in posts has:
     * id (int)
+    * threadid (int)
+    * threadname (string)
     * content (string, raw HTML)
     * deleted (bool)
     * edited (bool)
     * timecreated (int)
     * timecreatediso (string)
     * timecreatedrelative (string)
+    * isunread (bool)
     * authorname (string)
     * authorrole (string, optional)
     * isanonymous (bool)
@@ -41,29 +45,24 @@
         "neverbefore": false,
         "threadcount": 2,
         "postcount": 3,
-        "threads": [
+        "posts": [
             {
+                "id": 42,
                 "threadid": 7,
-                "name": "Week 1 reading",
-                "pageurl": "https://example.com/mod/page/view.php?id=10",
-                "postcount": 2,
-                "posts": [
-                    {
-                        "id": 42,
-                        "content": "<p>Hello</p>",
-                        "deleted": false,
-                        "edited": false,
-                        "timecreated": 1714694400,
-                        "timecreatediso": "3 May 2024, 12:00 PM",
-                        "timecreatedrelative": "1 day",
-                        "authorname": "Jane Doe",
-                        "authorrole": "Teacher",
-                        "isanonymous": false,
-                        "profileurl": "https://example.com/user/profile.php?id=2",
-                        "avatar": "<img class=\"userpicture\" src=\"https://example.com/u.png\" alt=\"\">",
-                        "posturl": "https://example.com/mod/page/view.php?id=10#embeddisc-post-42"
-                    }
-                ]
+                "threadname": "Week 1 reading",
+                "content": "<p>Hello</p>",
+                "deleted": false,
+                "edited": false,
+                "timecreated": 1714694400,
+                "timecreatediso": "3 May 2024, 12:00 PM",
+                "timecreatedrelative": "1 day",
+                "isunread": true,
+                "authorname": "Jane Doe",
+                "authorrole": "Teacher",
+                "isanonymous": false,
+                "profileurl": "https://example.com/user/profile.php?id=2",
+                "avatar": "<img class=\"userpicture\" src=\"https://example.com/u.png\" alt=\"\">",
+                "posturl": "https://example.com/mod/page/view.php?id=10#embeddisc-post-42"
             }
         ]
     }
@@ -89,33 +88,31 @@
     </div>
   {{/hasitems}}
 
-  {{#threads}}
+  {{#posts}}
     <section class="embeddisc-dashboard-thread">
-      <h3 class="embeddisc-dashboard-threadname">{{name}}</h3>
-      {{#posts}}
-        <a class="embeddisc-dashboard-postlink" href="{{{posturl}}}">
-          <div class="embeddisc-post {{#deleted}}embeddisc-post-deleted{{/deleted}}">
-            <div class="embeddisc-post-avatar">{{{avatar}}}</div>
-            <div class="embeddisc-post-body">
-              <div class="embeddisc-post-meta">
-                <span class="embeddisc-post-author">{{authorname}}</span>
-                {{#authorrole}}<span class="embeddisc-post-role">{{authorrole}}</span>{{/authorrole}}
-              </div>
-              <div class="embeddisc-post-time">
-                <span class="embeddisc-post-time-relative" data-region="time-ago" data-timestamp="{{timecreated}}"
-                  title="{{timecreatediso}}">{{timecreatedrelative}}</span>
-                {{#edited}}<span class="embeddisc-post-edited">{{#str}}edited, filter_embeddiscussion{{/str}}</span>{{/edited}}
-              </div>
-              {{#deleted}}
-                <div class="embeddisc-post-content text-muted">{{#str}}deleted_post, filter_embeddiscussion{{/str}}</div>
-              {{/deleted}}
-              {{^deleted}}
-                <div class="embeddisc-post-content">{{{content}}}</div>
-              {{/deleted}}
+      <h3 class="embeddisc-dashboard-threadname">{{threadname}}</h3>
+      <a class="embeddisc-dashboard-postlink" href="{{{posturl}}}">
+        <div class="embeddisc-post {{#deleted}}embeddisc-post-deleted{{/deleted}} {{#isunread}}embeddisc-dashboard-post-unread{{/isunread}}">
+          <div class="embeddisc-post-avatar">{{{avatar}}}</div>
+          <div class="embeddisc-post-body">
+            <div class="embeddisc-post-meta">
+              <span class="embeddisc-post-author">{{authorname}}</span>
+              {{#authorrole}}<span class="embeddisc-post-role">{{authorrole}}</span>{{/authorrole}}
             </div>
+            <div class="embeddisc-post-time">
+              <span class="embeddisc-post-time-relative" data-region="time-ago" data-timestamp="{{timecreated}}"
+                title="{{timecreatediso}}">{{timecreatedrelative}}</span>
+              {{#edited}}<span class="embeddisc-post-edited">{{#str}}edited, filter_embeddiscussion{{/str}}</span>{{/edited}}
+            </div>
+            {{#deleted}}
+              <div class="embeddisc-post-content text-muted">{{#str}}deleted_post, filter_embeddiscussion{{/str}}</div>
+            {{/deleted}}
+            {{^deleted}}
+              <div class="embeddisc-post-content">{{{content}}}</div>
+            {{/deleted}}
           </div>
-        </a>
-      {{/posts}}
+        </div>
+      </a>
     </section>
-  {{/threads}}
+  {{/posts}}
 </div>

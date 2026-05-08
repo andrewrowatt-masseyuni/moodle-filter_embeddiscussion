@@ -143,8 +143,13 @@ class provider implements core_userlist_provider, metadata_provider, plugin_prov
                     ];
                 }, array_values($posts));
 
+                $threadtitle = trim((string)($thread->pagetitle ?? ''));
+                if ($threadtitle === '') {
+                    $threadtitle = (string)($thread->idnumber ?? '');
+                }
+
                 writer::with_context($context)->export_data(
-                    [get_string('filtername', 'filter_embeddiscussion'), $thread->name],
+                    [get_string('filtername', 'filter_embeddiscussion'), $threadtitle],
                     (object)['posts' => $exportposts]
                 );
             }
