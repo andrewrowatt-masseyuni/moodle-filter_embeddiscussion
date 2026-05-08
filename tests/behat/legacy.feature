@@ -2,9 +2,8 @@
 Feature: Legacy filter_disqus and {comments} tokens are accepted as drop-in replacements
   In order to migrate existing content from filter_disqus and the comments block
   As a teacher
-  I should be able to leave the legacy [[filter_disqus]], [[filter_disqus:url_segment]] and
-  {comments} tokens in place and have the embeddiscussion filter render them with the
-  current page name (with the trailing site name removed) as the thread name
+  I should be able to leave the legacy [[filter_disqus]] and {comments} tokens in place and
+  have the discussion filter render them with the current page name
 
   Background:
     Given the following "courses" exist:
@@ -34,10 +33,10 @@ Feature: Legacy filter_disqus and {comments} tokens are accepted as drop-in repl
     When I log in as "student1"
     And I am on the "Discuss A" "book activity" page
     Then "[data-region='filter-embeddiscussion'][data-threadid]" "css_element" should exist
-    And "[data-region='embeddisc-root'][data-anonymous='0'][data-locked='0']" "css_element" should exist
+    And "[data-region='embeddisc-root'][data-anonymous='0']" "css_element" should exist
 
   @javascript
-  Scenario: [[filter_disqus:url_segment]] renders a placeholder with the URL segment in parentheses
+  Scenario: [[filter_disqus:url_segment]] is ignored
     Given the following "activities" exist:
       | activity | course | name      | idnumber |
       | book     | C1     | Discuss A | book1    |
@@ -46,8 +45,8 @@ Feature: Legacy filter_disqus and {comments} tokens are accepted as drop-in repl
       | Discuss A | Chapter 1 | [[filter_disqus:book-23]]   |
     When I log in as "student1"
     And I am on the "Discuss A" "book activity" page
-    Then "[data-region='filter-embeddiscussion'][data-threadid]" "css_element" should exist
-    And "[data-region='embeddisc-root']" "css_element" should exist
+    Then "[data-region='filter-embeddiscussion'][data-threadid]" "css_element" should not exist
+    And I should see "[[filter_disqus:book-23]]"
 
   @javascript
   Scenario: {comments} renders a placeholder using the page name with the site name stripped

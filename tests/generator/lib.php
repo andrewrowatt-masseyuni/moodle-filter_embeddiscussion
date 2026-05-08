@@ -30,9 +30,9 @@ class filter_embeddiscussion_generator extends component_generator_base {
     /**
      * Create a thread.
      *
-     * Required: idnumber (or legacy name). Optional: pagetitle, courseid (course context), activity
-     * (idnumber or activity name to anchor at module context),
-     * anonymous, locked.
+     * Required: idnumber (or legacy name). Optional: threadname, courseid
+     * (course context), activity (idnumber or activity name to anchor at
+     * module context), anonymous.
      *
      * @param array|stdClass $record
      * @return stdClass
@@ -46,22 +46,19 @@ class filter_embeddiscussion_generator extends component_generator_base {
             throw new coding_exception('filter_embeddiscussion thread requires an idnumber');
         }
 
-        $pagetitle = trim((string)($record['pagetitle'] ?? ($record['name'] ?? '')));
+        $threadname = trim((string)($record['threadname'] ?? ($record['name'] ?? '')));
 
         $context = $this->resolve_context($record);
         $thread = \filter_embeddiscussion\manager::get_or_create_thread(
             $idnumber,
             $context,
             null,
-            ($pagetitle !== '') ? $pagetitle : null
+            ($threadname !== '') ? $threadname : null
         );
 
         $update = [];
         if (array_key_exists('anonymous', $record)) {
             $update['anonymous'] = (int)(bool)$record['anonymous'];
-        }
-        if (array_key_exists('locked', $record)) {
-            $update['locked'] = (int)(bool)$record['locked'];
         }
         if ($update) {
             $update['id'] = $thread->id;

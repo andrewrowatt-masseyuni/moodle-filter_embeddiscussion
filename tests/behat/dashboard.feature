@@ -23,8 +23,8 @@ Feature: Embedded discussion dashboard
       | book     | C1     | Activity feed book | dashbook    |
     And the following "mod_book > chapters" exist:
       | book               | title              | content                            |
-      | Visible chat book  | Visible chapter    | {embeddeddiscussion:Visible chat}  |
-      | Activity feed book | Dashboard chapter  | {embeddiscussion:latestposts}      |
+      | Visible chat book  | Visible chapter    | {discussion:Visible chat}          |
+      | Activity feed book | Dashboard chapter  | {discussion:latestposts}           |
     # Backdate the student's last visit so posts created next pass the cutoff
     # but the dashboard page-load doesn't bump the timestamp forward (the
     # debounce is 60 seconds in user_accesstime_log).
@@ -52,7 +52,7 @@ Feature: Embedded discussion dashboard
       | book     | C1     | Hidden chat book  | hiddenbook | 0       |
     And the following "mod_book > chapters" exist:
       | book             | title           | content                            |
-      | Hidden chat book | Hidden chapter  | {embeddeddiscussion:Hidden chat}   |
+      | Hidden chat book | Hidden chapter  | {discussion:Hidden chat}           |
     And the following "filter_embeddiscussion > threads" exist:
       | name        | course | activity |
       | Hidden chat | C1     | hiddenbook |

@@ -26,6 +26,16 @@ namespace filter_embeddiscussion;
  * @covers \filter_embeddiscussion\manager
  */
 final class manager_test extends \advanced_testcase {
+    /**
+     * Return the persisted thread name across schema variants.
+     *
+     * @param \stdClass $thread
+     * @return string
+     */
+    protected function get_thread_name(\stdClass $thread): string {
+        return (string)($thread->threadname ?? ($thread->pagetitle ?? ''));
+    }
+
     public function test_get_or_create_thread_is_idempotent(): void {
         $this->resetAfterTest();
         $course = $this->getDataGenerator()->create_course();
@@ -37,6 +47,15 @@ final class manager_test extends \advanced_testcase {
 
         $c = manager::get_or_create_thread('Other thread', $context);
         $this->assertNotEquals($a->id, $c->id);
+    }
+
+    public function test_get_or_create_thread_persists_threadname(): void {
+        $this->resetAfterTest();
+        $course = $this->getDataGenerator()->create_course();
+        $context = \context_course::instance($course->id);
+
+        $thread = manager::get_or_create_thread('Test thread', $context, null, 'Visible thread name');
+        $this->assertSame('Visible thread name', $this->get_thread_name($thread));
     }
 
     public function test_create_post_and_view(): void {
@@ -68,24 +87,18 @@ final class manager_test extends \advanced_testcase {
         $this->assertTrue($view['canpost']);
     }
 
-    public function test_locked_thread_blocks_posts_and_edits(): void {
+    public function test_create_and_edit_post_when_thread_allows_writes(): void {
         $this->resetAfterTest();
         $course = $this->getDataGenerator()->create_course();
         $context = \context_course::instance($course->id);
         $student = $this->getDataGenerator()->create_and_enrol($course, 'student');
 
-        $thread = manager::get_or_create_thread('Locked', $context);
+        $thread = manager::get_or_create_thread('Writable', $context);
 
         $this->setUser($student);
         $post = manager::create_post($thread, $context, 0, 'Hello', $student->id);
-
-        $thread = manager::sync_settings_from_token($thread, ['locked' => true]);
-        $this->assertEquals(1, $thread->locked);
-
-        $this->expectException(\moodle_exception::class);
-        manager::create_post($thread, $context, 0, 'Should fail', $student->id);
-        // Subsequent edit attempt would also throw, but expectException only matches the first.
-        unset($post);
+        $edited = manager::edit_post($post->id, $thread, $context, 'Hello edited', $student->id);
+        $this->assertSame('Hello edited', strip_tags($edited->content));
     }
 
     public function test_voting_counts_and_toggle(): void {
@@ -171,13 +184,13 @@ final class manager_test extends \advanced_testcase {
         $visiblelabel = $this->getDataGenerator()->create_module('label', [
             'course' => $course->id,
             'name' => 'Visible label',
-            'intro' => '{embeddeddiscussion:visible-thread}',
+            'intro' => '{discussion:visible-thread}',
             'visible' => 1,
         ]);
         $hiddenlabel = $this->getDataGenerator()->create_module('label', [
             'course' => $course->id,
             'name' => 'Hidden label',
-            'intro' => '{embeddeddiscussion:hidden-thread}',
+            'intro' => '{discussion:hidden-thread}',
             'visible' => 0,
         ]);
 

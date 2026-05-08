@@ -83,7 +83,6 @@ class threads extends system_report {
             'thread:postcount',
             'thread:lastpost',
             'thread:anonymous',
-            'thread:locked',
             'thread:timecreated',
         ]);
 
@@ -99,7 +98,6 @@ class threads extends system_report {
         $this->add_filters_from_entities([
             'thread:name',
             'thread:anonymous',
-            'thread:locked',
             'thread:timecreated',
         ]);
     }

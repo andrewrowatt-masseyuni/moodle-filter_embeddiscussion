@@ -24,7 +24,7 @@ Feature: Editing and deleting embedded discussion posts
       | book     | C1     | Discuss A | book1    |
     And the following "mod_book > chapters" exist:
       | book      | title     | content                            |
-      | Discuss A | Chapter 1 | {embeddeddiscussion:Posts demo}    |
+      | Discuss A | Chapter 1 | {discussion:Posts demo}            |
     And the following "filter_embeddiscussion > threads" exist:
       | name       | course | activity |
       | Posts demo | C1     | book1    |

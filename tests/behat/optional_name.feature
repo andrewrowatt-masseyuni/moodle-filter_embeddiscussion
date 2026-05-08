@@ -1,10 +1,8 @@
 @filter @filter_embeddiscussion
-Feature: Embeddiscussion tokens with no thread name default to the page name
+Feature: Discussion tokens with no thread name default to the page name in Book chapters
   In order to keep tokens short in Book chapters where the chapter title is a sensible thread name
   As a teacher
-  I should be able to omit the thread name from the canonical token and have the
-  filter render a thread named after the page, with optional anonymous/locked
-  keywords supplied either after a comma or after a colon
+  I should be able to omit the thread name in Book chapters and still render a discussion
 
   Background:
     Given the following "courses" exist:
@@ -21,79 +19,53 @@ Feature: Embeddiscussion tokens with no thread name default to the page name
     And the "embeddiscussion" filter is "on"
 
   @javascript
-  Scenario: {embeddiscussion} renders a placeholder using the page name
+  Scenario: {discussion} renders a placeholder using the page name
+    Given the following "activities" exist:
+      | activity | course | name      | idnumber |
+      | book     | C1     | Discuss A | book1    |
+    And the following "mod_book > chapters" exist:
+      | book      | title     | content         |
+      | Discuss A | Chapter 1 | {discussion}    |
+    When I log in as "student1"
+    And I am on the "Discuss A" "book activity" page
+    Then "[data-region='filter-embeddiscussion'][data-threadid]" "css_element" should exist
+    And "[data-region='embeddisc-root'][data-anonymous='0']" "css_element" should exist
+
+  @javascript
+  Scenario: {anondiscussion} defaults the name and applies anonymous handles
     Given the following "activities" exist:
       | activity | course | name      | idnumber |
       | book     | C1     | Discuss A | book1    |
     And the following "mod_book > chapters" exist:
       | book      | title     | content             |
-      | Discuss A | Chapter 1 | {embeddiscussion}   |
+      | Discuss A | Chapter 1 | {anondiscussion}    |
     When I log in as "student1"
     And I am on the "Discuss A" "book activity" page
     Then "[data-region='filter-embeddiscussion'][data-threadid]" "css_element" should exist
-    And "[data-region='embeddisc-root'][data-anonymous='0'][data-locked='0']" "css_element" should exist
+    And "[data-region='embeddisc-root'][data-anonymous='1']" "css_element" should exist
 
   @javascript
-  Scenario: {embeddiscussion,anon} defaults the name and applies anonymous handles
+  Scenario: {anonymousdiscussion} works as an alias of {anondiscussion}
     Given the following "activities" exist:
       | activity | course | name      | idnumber |
       | book     | C1     | Discuss A | book1    |
     And the following "mod_book > chapters" exist:
       | book      | title     | content                  |
-      | Discuss A | Chapter 1 | {embeddiscussion,anon}   |
+      | Discuss A | Chapter 1 | {anonymousdiscussion}    |
     When I log in as "student1"
     And I am on the "Discuss A" "book activity" page
     Then "[data-region='filter-embeddiscussion'][data-threadid]" "css_element" should exist
-    And "[data-region='embeddisc-root'][data-anonymous='1'][data-locked='0']" "css_element" should exist
+    And "[data-region='embeddisc-root'][data-anonymous='1']" "css_element" should exist
 
   @javascript
-  Scenario: {embeddiscussion,locked} defaults the name and locks the thread
+  Scenario: Explicit thread names still work with {discussion:...}
     Given the following "activities" exist:
       | activity | course | name      | idnumber |
       | book     | C1     | Discuss A | book1    |
     And the following "mod_book > chapters" exist:
-      | book      | title     | content                    |
-      | Discuss A | Chapter 1 | {embeddiscussion,locked}   |
+      | book      | title     | content                     |
+      | Discuss A | Chapter 1 | {discussion:Named thread}   |
     When I log in as "student1"
     And I am on the "Discuss A" "book activity" page
     Then "[data-region='filter-embeddiscussion'][data-threadid]" "css_element" should exist
-    And "[data-region='embeddisc-root'][data-anonymous='0'][data-locked='1']" "css_element" should exist
-
-  @javascript
-  Scenario: {embeddiscussion,anon,locked} defaults the name and applies both keywords
-    Given the following "activities" exist:
-      | activity | course | name      | idnumber |
-      | book     | C1     | Discuss A | book1    |
-    And the following "mod_book > chapters" exist:
-      | book      | title     | content                         |
-      | Discuss A | Chapter 1 | {embeddiscussion,anon,locked}   |
-    When I log in as "student1"
-    And I am on the "Discuss A" "book activity" page
-    Then "[data-region='filter-embeddiscussion'][data-threadid]" "css_element" should exist
-    And "[data-region='embeddisc-root'][data-anonymous='1'][data-locked='1']" "css_element" should exist
-
-  @javascript
-  Scenario: {embeddiscussion:anon} defaults the name and applies anonymous handles
-    Given the following "activities" exist:
-      | activity | course | name      | idnumber |
-      | book     | C1     | Discuss A | book1    |
-    And the following "mod_book > chapters" exist:
-      | book      | title     | content                  |
-      | Discuss A | Chapter 1 | {embeddiscussion:anon}   |
-    When I log in as "student1"
-    And I am on the "Discuss A" "book activity" page
-    Then "[data-region='filter-embeddiscussion'][data-threadid]" "css_element" should exist
-    And "[data-region='embeddisc-root'][data-anonymous='1'][data-locked='0']" "css_element" should exist
-
-  @javascript
-  Scenario: {embeddiscussion:locked,anon} defaults the name and applies both keywords
-    Given the following "activities" exist:
-      | activity | course | name      | idnumber |
-      | book     | C1     | Discuss A | book1    |
-    And the following "mod_book > chapters" exist:
-      | book      | title     | content                         |
-      | Discuss A | Chapter 1 | {embeddiscussion:locked,anon}   |
-    When I log in as "student1"
-    And I am on the "Discuss A" "book activity" page
-    Then "[data-region='filter-embeddiscussion'][data-threadid]" "css_element" should exist
-    And "[data-region='embeddisc-root'][data-anonymous='1'][data-locked='1']" "css_element" should exist
+    And "[data-region='embeddisc-root'][data-anonymous='0']" "css_element" should exist

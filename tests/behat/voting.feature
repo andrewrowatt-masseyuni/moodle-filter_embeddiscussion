@@ -24,7 +24,7 @@ Feature: Voting on embedded discussion posts
       | book     | C1     | Discuss A | book1    |
     And the following "mod_book > chapters" exist:
       | book      | title     | content                              |
-      | Discuss A | Chapter 1 | {embeddeddiscussion:Voting demo}     |
+      | Discuss A | Chapter 1 | {discussion:Voting demo}             |
     And the following "filter_embeddiscussion > threads" exist:
       | name        | course | activity |
       | Voting demo | C1     | book1    |

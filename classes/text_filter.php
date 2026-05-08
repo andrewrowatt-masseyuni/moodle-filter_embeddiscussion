@@ -19,28 +19,17 @@ namespace filter_embeddiscussion;
 /**
  * embeddiscussion filter
  *
- * Replaces tokens of the form {embeddeddiscussion:Thread idnumber[,keyword...]}
+ * Replaces tokens of the form {discussion[:Thread name]},
+ * {anondiscussion[:Thread name]} and {anonymousdiscussion[:Thread name]}
  * with a skeleton container that the JS module populates asynchronously.
  *
- * The thread idnumber is optional. If the body contains no idnumber (only
- * keywords, or nothing at all), the idnumber defaults to a slugified version of
- * the current page name. All of these resolve to the page-title slug:
- *   - {embeddiscussion}
- *   - {embeddiscussion,anon}
- *   - {embeddiscussion,locked}
- *   - {embeddiscussion:anon}
- *   - {embeddiscussion:locked,anon}
+ * In Book chapter pages, the thread name is optional and defaults to the
+ * current page name derived from $PAGE->title.
  *
- * Optional trailing keywords (case-insensitive, any order):
- *   - lock | locked     - the thread is locked (no new posts or edits).
- *   - anon | anonymous  - student posts are shown with anonymous handles.
- *
- * Legacy syntaxes (drop-in replacement for filter_disqus and the {comments}
- * block) can also be recognised and rewritten to the canonical token before
- * processing when enabled via site settings:
- *   - [[filter_disqus]]                 -> {embeddiscussion:<page title-derived idnumber>}
- *   - [[filter_disqus:<url_segment>]]   -> {embeddiscussion:<page title-derived idnumber> (<url_segment>)}
- *   - {comments}                        -> {embeddiscussion:<page title-derived idnumber>}
+ * Legacy syntaxes can also be recognised and rewritten to the canonical token
+ * before processing when enabled via site settings:
+ *   - [[filter_disqus]]  -> {discussion:<page name>}
+ *   - {comments}         -> {discussion:<page name>}
  * where <page name> is the current $PAGE->title with any trailing
  * " | <site fullname>" or " | <site shortname>" segment stripped off.
  *
@@ -49,21 +38,17 @@ namespace filter_embeddiscussion;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class text_filter extends \core_filters\text_filter {
-    /**
-     * Pattern matches both {embeddeddiscussion..} and {embeddiscussion..} with an
-    * optional body introduced by ':' (explicit idnumber) or ',' (keywords only,
-    * idnumber defaults to the page-title slug).
-     */
-    const PATTERN = '/\{embedd(?:eddi|i)scussion([:,][^}]*)?\}/i';
+    /** Pattern matches {discussion}, {discussion:...}, {anondiscussion:...}, {anonymousdiscussion:...}. */
+    const PATTERN = '/\{(discussion|anondiscussion|anonymousdiscussion)(?::([^}]*))?\}/i';
 
-    /** Pattern matches the legacy [[filter_disqus]] / [[filter_disqus:segment]] / {comments} tokens. */
-    const LEGACY_PATTERN = '/\[\[filter_disqus(?::([^\]]*))?\]\]|\{comments\}/i';
+    /** Pattern matches the legacy [[filter_disqus]] and {comments} tokens. */
+    const LEGACY_PATTERN = '/\[\[filter_disqus\]\]|\{comments\}/i';
 
     /** @var bool Module/page resources requested. */
     protected static $requirementsdone = false;
 
     /**
-     * Filter text replacing the token with a skeleton container.
+     * Filter text replacing supported tokens with skeleton containers.
      *
      * @param string $text some HTML content to process.
      * @param array $options options passed to the filters
@@ -71,6 +56,8 @@ class text_filter extends \core_filters\text_filter {
      */
     public function filter($text, array $options = []) {
         global $PAGE, $OUTPUT;
+
+        unset($options);
 
         if (!\is_string($text)) {
             return $text;
@@ -84,43 +71,11 @@ class text_filter extends \core_filters\text_filter {
             $text = self::convert_legacy_tokens($text, $disqusenabled, $commentsenabled);
         }
 
-        if (\stripos($text, 'iscussion') === false) {
+        if (\stripos($text, 'discussion') === false) {
             return $text;
         }
 
         if (!preg_match(self::PATTERN, $text)) {
-            return $text;
-        }
-
-        if (!$this->can_embed_discussions_here()) {
-            $showunsupported = $this->can_display_unsupported_notice();
-            $dashboardused = false;
-            $self = $this;
-
-            $text = preg_replace_callback(self::PATTERN, function ($matches) use ($OUTPUT, $showunsupported, &$dashboardused, $self) {
-                $captured = $matches[1] ?? '';
-                $hascolon = ($captured !== '' && $captured[0] === ':');
-                $body = $hascolon ? substr($captured, 1) : $captured;
-
-                if ($hascolon && self::is_course_feed_token($body)) {
-                    $rendered = $self->render_dashboard_placeholder($OUTPUT);
-                    if ($rendered !== null) {
-                        $dashboardused = true;
-                        return $rendered;
-                    }
-                    return $matches[0];
-                }
-
-                if (!$showunsupported) {
-                    return '';
-                }
-                return $OUTPUT->render_from_template('filter_embeddiscussion/cannotbeembeddedhere', []);
-            }, $text);
-
-            if ($dashboardused) {
-                $PAGE->requires->js_call_amd('filter_embeddiscussion/dashboard', 'init');
-            }
-
             return $text;
         }
 
@@ -140,15 +95,11 @@ class text_filter extends \core_filters\text_filter {
         $self = $this;
 
         $text = preg_replace_callback(self::PATTERN, function ($matches) use ($self, $OUTPUT, $pageurl, &$dashboardused) {
-            $captured = $matches[1] ?? '';
-            // A leading ':' introduces an explicit idnumber; a leading ',' starts the keyword
-            // list with no idnumber. Strip a leading ':' so parse_token_body sees only the body;
-            // a leading ',' is left in place so parse_token_body returns an empty idnumber and
-            // we fall back to the current page title below.
-            $hascolon = ($captured !== '' && $captured[0] === ':');
-            $body = $hascolon ? substr($captured, 1) : $captured;
+            $tokentype = strtolower($matches[1] ?? 'discussion');
+            $body = self::sanitise_thread_name($matches[2] ?? '');
+            $anonymous = ($tokentype === 'anondiscussion' || $tokentype === 'anonymousdiscussion');
 
-            if ($hascolon && self::is_course_feed_token($body)) {
+            if ($tokentype === 'discussion' && self::is_course_feed_token($body)) {
                 $rendered = $self->render_dashboard_placeholder($OUTPUT);
                 if ($rendered !== null) {
                     $dashboardused = true;
@@ -157,7 +108,7 @@ class text_filter extends \core_filters\text_filter {
                 return $matches[0];
             }
 
-            $rendered = $self->render_thread_placeholder($body, $hascolon, $OUTPUT, $pageurl);
+            $rendered = $self->render_thread_placeholder($body, $anonymous, $OUTPUT, $pageurl);
             return $rendered ?? $matches[0];
         }, $text);
 
@@ -174,53 +125,8 @@ class text_filter extends \core_filters\text_filter {
     }
 
     /**
-     * Parse the body of an embeddiscussion token into an idnumber and trailing keywords.
-     *
-     * The body is split on commas. Trailing parts that match a recognised keyword
-     * (lock/locked/anon/anonymous, case-insensitive) or are empty are stripped
-     * from the right; the remaining parts are rejoined with ", " to form the
-     * idnumber. Spaces around delimiters are trimmed; keyword order is
-     * unimportant. A body consisting entirely of keywords (e.g. "anon",
-     * "locked,anon") yields an empty idnumber — the caller can then fall back
-     * to a default such as the page-title slug.
-     *
-     * @param string $body the text between "embeddeddiscussion:" and "}"
-     * @return array{name: string, anonymous: bool, locked: bool}
-     */
-    public static function parse_token_body(string $body): array {
-        $anonymous = false;
-        $locked = false;
-
-        $parts = array_map('trim', explode(',', $body));
-
-        // Strip trailing empties and recognised keywords from the right.
-        while (!empty($parts)) {
-            $tail = end($parts);
-            if ($tail === '') {
-                array_pop($parts);
-                continue;
-            }
-            $key = strtolower($tail);
-            if ($key === 'lock' || $key === 'locked') {
-                $locked = true;
-                array_pop($parts);
-                continue;
-            }
-            if ($key === 'anon' || $key === 'anonymous') {
-                $anonymous = true;
-                array_pop($parts);
-                continue;
-            }
-            break;
-        }
-
-        $name = trim(implode(', ', $parts));
-        return ['name' => $name, 'anonymous' => $anonymous, 'locked' => $locked];
-    }
-
-    /**
-     * Rewrite enabled legacy filter_disqus / {comments} tokens in text to the
-     * canonical {embeddiscussion:...} token, deriving the thread idnumber from
+     * Rewrite enabled legacy [[filter_disqus]] / {comments} tokens in text to
+     * the canonical {discussion:...} token, deriving the thread name from
      * $PAGE->title.
      *
      * If the page title is unavailable (for example, when the filter runs in a
@@ -249,34 +155,23 @@ class text_filter extends \core_filters\text_filter {
             return $text;
         }
 
-        $pagetitle = self::derive_current_page_name();
-        if ($pagetitle === '') {
-            return $text;
-        }
-
-        $pageidnumber = self::sanitise_thread_name($pagetitle);
-        if ($pageidnumber === '') {
+        $threadname = self::sanitise_thread_name(self::derive_current_page_name());
+        if ($threadname === '') {
             return $text;
         }
 
         if ($disqusenabled) {
-            $text = preg_replace_callback(
-                '/\[\[filter_disqus(?::([^\]]*))?\]\]/i',
-                function ($matches) use ($pageidnumber) {
-                    $segment = isset($matches[1]) ? trim($matches[1]) : '';
-                    $threadidnumber = $segment !== '' ? $pageidnumber . ' (' . $segment . ')' : $pageidnumber;
-                    return '{embeddiscussion:' . self::sanitise_thread_name($threadidnumber) . '}';
-                },
+            $text = preg_replace(
+                '/\[\[filter_disqus\]\]/i',
+                '{discussion:' . $threadname . '}',
                 $text
             );
         }
 
         if ($commentsenabled) {
-            $text = preg_replace_callback(
+            $text = preg_replace(
                 '/\{comments\}/i',
-                function () use ($pageidnumber) {
-                    return '{embeddiscussion:' . $pageidnumber . '}';
-                },
+                '{discussion:' . $threadname . '}',
                 $text
             );
         }
@@ -303,8 +198,8 @@ class text_filter extends \core_filters\text_filter {
     }
 
     /**
-     * Render a course-feed placeholder ({embeddiscussion:dashboard} or
-     * {embeddiscussion:latestposts}), or null if no enclosing course can be
+     * Render a course-feed placeholder ({discussion:dashboard} or
+     * {discussion:latestposts}), or null if no enclosing course can be
      * determined and the token should be left untouched.
      *
      * @param object $output the page output renderer
@@ -322,49 +217,52 @@ class text_filter extends \core_filters\text_filter {
     }
 
     /**
-     * Render a {embeddiscussion[:Idnumber][,keywords]} thread placeholder.
-     * Returns null when the body parses to an empty idnumber with no keywords (a malformed
-     * token to preserve verbatim) or when the thread cannot be resolved.
+     * Render a discussion placeholder.
      *
-     * @param string $body raw token body (without the leading ':' if any)
-     * @param bool $hascolon true if the original token used the explicit-idnumber
-     *                       ':' separator rather than the keyword-only ',' form
+     * In Book chapter pages the thread name can be omitted and falls back to
+     * derive_current_page_name(). In all other locations, an omitted name is
+     * treated as unsupported and either renders a guidance notice (for editors)
+     * or nothing (for non-editors).
+     *
+     * @param string $name explicit thread name from the token body
+     * @param bool $anonymous whether anonymous mode should be applied
      * @param object $output the page output renderer
      * @param string|null $pageurl URL of the host page, for back-linking
-     * @return string|null rendered HTML, or null to keep the original token text
+     * @return string|null rendered HTML, empty string to remove token, or null
+     *                     to keep the original token text
      */
     protected function render_thread_placeholder(
-        string $body,
-        bool $hascolon,
+        string $name,
+        bool $anonymous,
         $output,
         ?string $pageurl
     ): ?string {
-        $parsed = self::parse_token_body($body);
-        $pagetitle = self::derive_current_page_name();
-
-        if ($parsed['name'] === '') {
-            $haskeyword = $parsed['anonymous'] || $parsed['locked'];
-            if ($hascolon && !$haskeyword) {
-                // Explicit empty idnumber with no keywords (e.g. "{embeddiscussion:}") —
-                // preserve the broken token rather than silently changing it.
-                return null;
-            }
-            $parsed['name'] = self::slugify_thread_idnumber($pagetitle);
-            if ($parsed['name'] === '') {
-                return null;
+        $threadname = self::sanitise_thread_name($name);
+        if ($threadname === '') {
+            if ($this->can_embed_discussions_here()) {
+                $threadname = self::sanitise_thread_name(self::derive_current_page_name());
+                if ($threadname === '') {
+                    return null;
+                }
+            } else {
+                if ($this->can_display_unsupported_notice()) {
+                    return $output->render_from_template('filter_embeddiscussion/cannotbeembeddedhere', []);
+                }
+                return '';
             }
         }
+
         // Resolve the thread server-side so the browser only learns the thread id.
-        // anonymous/locked are token-authored settings — never trust them from the client.
+        // Anonymous mode is token-authored and never trusted from the client.
         try {
-            $thread = manager::get_or_create_thread($parsed['name'], $this->context, $pageurl, $pagetitle);
+            $thread = manager::get_or_create_thread($threadname, $this->context, $pageurl, $threadname);
             $thread = manager::sync_settings_from_token($thread, [
-                'anonymous' => $parsed['anonymous'],
-                'locked' => $parsed['locked'],
+                'anonymous' => $anonymous,
             ]);
         } catch (\Throwable $e) {
             return null;
         }
+
         return $output->render_from_template('filter_embeddiscussion/placeholder', [
             'uid' => manager::get_thread_uid($thread->id, $this->context->id),
             'threadid' => (int)$thread->id,
@@ -414,7 +312,7 @@ class text_filter extends \core_filters\text_filter {
             return false;
         }
 
-        // moodle_page uses magic properties; isset() can be unreliable here.
+        // Moodle page uses magic properties; isset() can be unreliable here.
         try {
             $pagecontext = $PAGE->context;
         } catch (\Throwable $e) {
@@ -425,7 +323,7 @@ class text_filter extends \core_filters\text_filter {
             return false;
         }
 
-        list($context, $course, $cm) = get_context_info_array($pagecontext->id);
+        [, , $cm] = get_context_info_array($pagecontext->id);
 
         if (!isset($cm) || !is_object($cm)) {
             return false;
@@ -435,7 +333,7 @@ class text_filter extends \core_filters\text_filter {
             return false;
         }
 
-        // moodle_page uses magic properties; isset() can be unreliable here.
+        // Moodle page uses magic properties; isset() can be unreliable here.
         try {
             $url = $PAGE->url;
         } catch (\Throwable $e) {
@@ -495,29 +393,6 @@ class text_filter extends \core_filters\text_filter {
     }
 
     /**
-     * Convert a human page title into a stable idnumber slug.
-     *
-     * @param string $pagetitle
-     * @return string
-     */
-    protected static function slugify_thread_idnumber(string $pagetitle): string {
-        $pagetitle = trim($pagetitle);
-        if ($pagetitle === '') {
-            return '';
-        }
-
-        $slug = \core_text::specialtoascii($pagetitle);
-        $slug = \core_text::strtolower((string)$slug);
-        $slug = preg_replace('/[^a-z0-9]+/', '-', $slug);
-        $slug = trim((string)$slug, '-');
-        if ($slug !== '') {
-            return $slug;
-        }
-
-        return 'thread-' . substr(sha1($pagetitle), 0, 12);
-    }
-
-    /**
      * Strip the trailing site fullname or shortname segment from a page title.
      *
      * Moodle pages are titled "<page name> | <site name>" (see
@@ -553,16 +428,13 @@ class text_filter extends \core_filters\text_filter {
     }
 
     /**
-     * Remove characters that would prematurely terminate the canonical token or
-     * be misinterpreted by parse_token_body() when a thread name is composed
-     * from a page title.
+     * Remove characters that would prematurely terminate a token.
      *
-     * @param string $name the thread name being built from page metadata
+     * @param string $name the thread name
      * @return string the sanitised thread name
      */
     protected static function sanitise_thread_name(string $name): string {
-        // The canonical token ends at the first '}' so strip any literal closing brace.
-        // Commas would otherwise cause parse_token_body() to look for trailing keywords.
-        return trim(str_replace(['}', ','], ['', ' '], $name));
+        // The canonical token ends at the first '}' so strip literal closing braces.
+        return trim(str_replace('}', '', $name));
     }
 }

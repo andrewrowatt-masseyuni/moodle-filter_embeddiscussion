@@ -16,7 +16,7 @@
 /**
  * Embedded discussion dashboard bootstrapper.
  *
- * Listens for {embeddiscussion:dashboard} placeholders and hydrates them with
+ * Listens for {discussion:dashboard} placeholders and hydrates them with
  * a list of new posts in the course since the user's last visit.
  *
  * @module     filter_embeddiscussion/dashboard

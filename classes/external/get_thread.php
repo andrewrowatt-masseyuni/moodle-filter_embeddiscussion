@@ -24,9 +24,9 @@ use filter_embeddiscussion\manager;
 /**
  * Return an embedded discussion thread by id.
  *
- * The thread is created (and its anonymous/locked flags synced from the
- * filter token) server-side by the filter at render time, so this endpoint
- * only needs the thread id — never trust thread settings from the client.
+ * The thread is created (and its anonymous flag synced from the filter token)
+ * server-side by the filter at render time, so this endpoint only needs the
+ * thread id — never trust thread settings from the client.
  *
  * @package    filter_embeddiscussion
  * @copyright  2026 Andrew Rowatt <A.J.Rowatt@massey.ac.nz>

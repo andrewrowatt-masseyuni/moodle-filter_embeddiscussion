@@ -143,7 +143,7 @@ class provider implements core_userlist_provider, metadata_provider, plugin_prov
                     ];
                 }, array_values($posts));
 
-                $threadtitle = trim((string)($thread->pagetitle ?? ''));
+                $threadtitle = trim((string)($thread->threadname ?? ($thread->pagetitle ?? '')));
                 if ($threadtitle === '') {
                     $threadtitle = (string)($thread->idnumber ?? '');
                 }

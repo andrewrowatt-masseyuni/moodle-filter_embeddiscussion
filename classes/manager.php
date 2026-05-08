@@ -30,6 +30,27 @@ class manager {
     /** Allowed inline tags after sanitisation. */
     const ALLOWED_TAGS = '<p><br><b><strong><i><em><u><a><img><mark><ul><ol><li><blockquote><span>';
 
+    /** @var bool|null cache of whether the threadname column exists. */
+    protected static $threadnamecol = null;
+
+    /**
+     * Whether the thread table has the threadname column (new schema).
+     *
+     * @return bool
+     */
+    protected static function has_threadname_column(): bool {
+        global $DB;
+
+        if (self::$threadnamecol === null) {
+            $manager = $DB->get_manager();
+            $table = new \xmldb_table('filter_embeddiscussion_thread');
+            $field = new \xmldb_field('threadname');
+            self::$threadnamecol = $manager->field_exists($table, $field);
+        }
+
+        return self::$threadnamecol;
+    }
+
     /**
      * Get an existing thread by idnumber+context, or null.
      *
@@ -55,15 +76,15 @@ class manager {
      * @param \context $context
      * @param string|null $pageurl URL of the page hosting the thread; refreshed on each
      *                             call so the stored value tracks the current location.
-     * @param string|null $pagetitle page title at token-processing time; refreshed
-     *                               on each call when available.
+     * @param string|null $threadname thread name at token-processing time; refreshed
+     *                                on each call when available.
      * @return \stdClass
      */
     public static function get_or_create_thread(
         string $idnumber,
         \context $context,
         ?string $pageurl = null,
-        ?string $pagetitle = null
+        ?string $threadname = null
     ): \stdClass {
         global $DB;
 
@@ -71,7 +92,8 @@ class manager {
         if ($idnumber === '') {
             throw new \invalid_parameter_exception('Thread idnumber cannot be empty');
         }
-        $pagetitle = trim((string)$pagetitle);
+        $threadname = trim((string)$threadname);
+        $threadnamefield = self::has_threadname_column() ? 'threadname' : 'pagetitle';
 
         $existing = self::find_thread($idnumber, $context->id);
         if ($existing) {
@@ -80,8 +102,8 @@ class manager {
                 $existing->pageurl = $pageurl;
                 $changed = true;
             }
-            if ($pagetitle !== '' && (string)($existing->pagetitle ?? '') !== $pagetitle) {
-                $existing->pagetitle = $pagetitle;
+            if ($threadname !== '' && (string)($existing->{$threadnamefield} ?? '') !== $threadname) {
+                $existing->{$threadnamefield} = $threadname;
                 $changed = true;
             }
             if ($changed) {
@@ -103,12 +125,11 @@ class manager {
 
         $record = (object)[
             'idnumber' => $idnumber,
-            'pagetitle' => ($pagetitle !== '') ? $pagetitle : $idnumber,
+            $threadnamefield => ($threadname !== '') ? $threadname : $idnumber,
             'namehash' => sha1($idnumber),
             'contextid' => $context->id,
             'courseid' => $courseid,
             'anonymous' => 0,
-            'locked' => 0,
             'handleoffset' => random_int(0, $masterlistsize - 1),
             'pageurl' => ($pageurl !== null && $pageurl !== '') ? $pageurl : null,
             'timecreated' => $now,
@@ -132,12 +153,12 @@ class manager {
     }
 
     /**
-     * Sync the thread's anonymous/locked flags to match the values declared on
+     * Sync the thread's anonymous flag to match the value declared on
      * the filter token. Authority lives with whoever can edit the host content,
      * so no extra capability check is performed here.
      *
      * @param \stdClass $thread
-     * @param array $settings keys: anonymous, locked (bool)
+     * @param array $settings keys: anonymous (bool)
      * @return \stdClass updated thread record
      */
     public static function sync_settings_from_token(\stdClass $thread, array $settings): \stdClass {
@@ -151,14 +172,6 @@ class manager {
                 $changed = true;
             }
         }
-        if (array_key_exists('locked', $settings)) {
-            $newval = $settings['locked'] ? 1 : 0;
-            if ((int)$thread->locked !== $newval) {
-                $thread->locked = $newval;
-                $changed = true;
-            }
-        }
-
         if ($changed) {
             $thread->timemodified = time();
             $DB->update_record('filter_embeddiscussion_thread', $thread);
@@ -210,10 +223,6 @@ class manager {
         global $DB;
 
         require_capability('filter/embeddiscussion:createpost', $context);
-
-        if ($thread->locked) {
-            throw new \moodle_exception('error_threadlocked', 'filter_embeddiscussion');
-        }
 
         $clean = self::sanitise($content);
         if (trim(strip_tags($clean)) === '' && stripos($clean, '<img') === false) {
@@ -278,10 +287,6 @@ class manager {
             throw new \moodle_exception('error_invalidthread', 'filter_embeddiscussion');
         }
 
-        if ($thread->locked) {
-            throw new \moodle_exception('error_threadlocked', 'filter_embeddiscussion');
-        }
-
         $isown = ((int)$post->userid === $userid);
         if ($isown) {
             require_capability('filter/embeddiscussion:editownpost', $context);
@@ -306,8 +311,6 @@ class manager {
 
     /**
      * Delete a post (soft delete: keep the row, blank content).
-     *
-     * Locked threads do not block deletion: deletion is moderation, not authoring.
      *
      * @param int $postid
      * @param \stdClass $thread
@@ -503,7 +506,7 @@ class manager {
         $candeleteany = has_capability('filter/embeddiscussion:deleteanypost', $context);
         $candeleteown = has_capability('filter/embeddiscussion:deleteownpost', $context);
         $caneditown = has_capability('filter/embeddiscussion:editownpost', $context);
-        $canpost = has_capability('filter/embeddiscussion:createpost', $context) && !$thread->locked;
+        $canpost = has_capability('filter/embeddiscussion:createpost', $context);
 
         $renderer = $PAGE->get_renderer('core');
 
@@ -527,10 +530,9 @@ class manager {
 
         return [
             'threadid' => (int)$thread->id,
-            'name' => (string)$thread->idnumber,
+            'name' => self::thread_display_name($thread),
             'anonymous' => (bool)$thread->anonymous,
             'currentuserisanonymous' => $currentuserisanonymous,
-            'locked' => (bool)$thread->locked,
             'canpost' => $canpost,
             'canmanageposts' => $canmanageposts,
             'postcount' => count($postsout),
@@ -609,7 +611,7 @@ class manager {
         $candelete = !$post->deleted && (
             ($isown && $candeleteown) || $candeleteany
         );
-        $canedit = !$post->deleted && !$thread->locked && (
+        $canedit = !$post->deleted && (
             ($isown && $caneditown) || $canmanageposts
         );
 
@@ -633,7 +635,7 @@ class manager {
             'votes_my' => (int)$votes['my'],
             'canedit' => $canedit,
             'candelete' => $candelete,
-            'canreply' => has_capability('filter/embeddiscussion:createpost', $context) && !$thread->locked,
+            'canreply' => has_capability('filter/embeddiscussion:createpost', $context),
         ];
     }
 
@@ -681,11 +683,12 @@ class manager {
         $renderer = $PAGE->get_renderer('core');
 
         [$insql, $inparams] = $DB->get_in_or_equal($contextids, SQL_PARAMS_NAMED, 'ctx');
+        $orderfield = self::has_threadname_column() ? 'threadname' : 'pagetitle';
         $threads = $DB->get_records_select(
             'filter_embeddiscussion_thread',
             "contextid $insql",
             $inparams,
-            'pagetitle ASC, idnumber ASC'
+            $orderfield . ' ASC, idnumber ASC'
         );
 
         $threadsout = [];
@@ -770,9 +773,13 @@ class manager {
      * @return string
      */
     protected static function thread_display_name(\stdClass $thread): string {
-        $pagetitle = trim((string)($thread->pagetitle ?? ''));
-        if ($pagetitle !== '') {
-            return $pagetitle;
+        $threadname = trim((string)($thread->threadname ?? ''));
+        if ($threadname !== '') {
+            return $threadname;
+        }
+        $threadname = trim((string)($thread->pagetitle ?? ''));
+        if ($threadname !== '') {
+            return $threadname;
         }
         return trim((string)($thread->idnumber ?? ''));
     }

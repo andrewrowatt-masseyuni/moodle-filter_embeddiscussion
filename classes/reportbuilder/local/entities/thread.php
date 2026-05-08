@@ -81,9 +81,9 @@ class thread extends base {
         ))
             ->add_joins($this->get_joins())
             ->set_type(column::TYPE_TEXT)
-            ->add_fields("{$alias}.id, {$alias}.idnumber")
+            ->add_field("{$alias}.threadname", 'name')
             ->set_is_sortable(true)
-            ->set_callback(static function (?string $value, \stdClass $row): string {
+            ->set_callback(static function (?string $value): string {
                 if ($value === null) {
                     return '';
                 }
@@ -132,19 +132,6 @@ class thread extends base {
             });
 
         $columns[] = (new column(
-            'locked',
-            new lang_string('locked', 'filter_embeddiscussion'),
-            $this->get_entity_name()
-        ))
-            ->add_joins($this->get_joins())
-            ->set_type(column::TYPE_BOOLEAN)
-            ->add_field("{$alias}.locked")
-            ->set_is_sortable(true)
-            ->set_callback(static function ($value): string {
-                return $value ? get_string('yes') : get_string('no');
-            });
-
-        $columns[] = (new column(
             'timecreated',
             new lang_string('timecreated', 'core_reportbuilder'),
             $this->get_entity_name()
@@ -174,7 +161,7 @@ class thread extends base {
             'name',
             new lang_string('threadname', 'filter_embeddiscussion'),
             $this->get_entity_name(),
-            "{$alias}.idnumber"
+            "{$alias}.threadname"
         ))->add_joins($this->get_joins());
 
         $filters[] = (new filter(
@@ -183,14 +170,6 @@ class thread extends base {
             new lang_string('anonymous', 'filter_embeddiscussion'),
             $this->get_entity_name(),
             "{$alias}.anonymous"
-        ))->add_joins($this->get_joins());
-
-        $filters[] = (new filter(
-            boolean_select::class,
-            'locked',
-            new lang_string('locked', 'filter_embeddiscussion'),
-            $this->get_entity_name(),
-            "{$alias}.locked"
         ))->add_joins($this->get_joins());
 
         $filters[] = (new filter(

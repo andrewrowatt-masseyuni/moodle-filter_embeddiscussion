@@ -22,7 +22,7 @@ Feature: Embedded discussion filter
       | book     | C1     | Discuss A | book1    |
     And the following "mod_book > chapters" exist:
       | book      | title     | content                              |
-      | Discuss A | Chapter 1 | {embeddeddiscussion:Course 1 Demo}   |
+      | Discuss A | Chapter 1 | {discussion:Course 1 Demo}           |
 
   @javascript
   Scenario: Plugin appears in the additional plugins list
@@ -37,4 +37,4 @@ Feature: Embedded discussion filter
     Given I log in as "student1"
     And I am on the "Discuss A" "book activity" page
     Then "[data-region='filter-embeddiscussion'][data-threadid]" "css_element" should exist
-    And "[data-region='embeddisc-root'][data-anonymous='0'][data-locked='0']" "css_element" should exist
+    And "[data-region='embeddisc-root'][data-anonymous='0']" "css_element" should exist

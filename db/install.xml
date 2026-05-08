@@ -8,12 +8,11 @@
       <FIELDS>
         <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
         <FIELD NAME="idnumber" TYPE="char" LENGTH="255" NOTNULL="true" COMMENT="Thread idnumber from filter token"/>
-        <FIELD NAME="pagetitle" TYPE="char" LENGTH="255" NOTNULL="false" COMMENT="Page title captured when the token was processed"/>
+        <FIELD NAME="threadname" TYPE="char" LENGTH="255" NOTNULL="false" COMMENT="Thread name captured when the token was processed"/>
         <FIELD NAME="namehash" TYPE="char" LENGTH="40" NOTNULL="true" COMMENT="SHA1 of idnumber for unique index"/>
         <FIELD NAME="contextid" TYPE="int" LENGTH="10" NOTNULL="true" COMMENT="Context where the thread was first initialised"/>
         <FIELD NAME="courseid" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" COMMENT="Course where the thread lives (0 if site)"/>
         <FIELD NAME="anonymous" TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="0" COMMENT="1 = anonymous handles for students"/>
-        <FIELD NAME="locked" TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="0" COMMENT="1 = no new posts or edits"/>
         <FIELD NAME="handleoffset" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" COMMENT="Random offset into the handle master list"/>
         <FIELD NAME="pageurl" TYPE="text" NOTNULL="false" COMMENT="Last seen URL of the page that hosts this thread"/>
         <FIELD NAME="timecreated" TYPE="int" LENGTH="10" NOTNULL="true"/>
