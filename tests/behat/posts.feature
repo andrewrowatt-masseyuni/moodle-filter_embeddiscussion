@@ -20,11 +20,14 @@ Feature: Editing and deleting embedded discussion posts
       | student2 | C1     | student        |
     And the "embeddiscussion" filter is "on"
     And the following "activities" exist:
-      | activity | course | name      | intro                            | idnumber |
-      | label    | C1     | Discuss A | {embeddeddiscussion:Posts demo}  | l1       |
+      | activity | course | name      | idnumber |
+      | book     | C1     | Discuss A | book1    |
+    And the following "mod_book > chapters" exist:
+      | book      | title     | content                            |
+      | Discuss A | Chapter 1 | {embeddeddiscussion:Posts demo}    |
     And the following "filter_embeddiscussion > threads" exist:
       | name       | course | activity |
-      | Posts demo | C1     | l1       |
+      | Posts demo | C1     | book1    |
     And the following "filter_embeddiscussion > posts" exist:
       | thread     | user     | content                                  |
       | Posts demo | student1 | First post by student one to talk about  |
@@ -35,7 +38,7 @@ Feature: Editing and deleting embedded discussion posts
   @javascript
   Scenario: Author sees Edit and Delete buttons on their own post
     Given I log in as "student1"
-    And I am on "Course 1" course homepage
+    And I am on the "Discuss A" "book activity" page
     And the embedded discussion is loaded
     Then I should see "First post by student one"
     And I should see "Reply text from the second student"
@@ -43,7 +46,7 @@ Feature: Editing and deleting embedded discussion posts
   @javascript
   Scenario: Student deletes their own post and sees the deleted placeholder
     Given I log in as "student1"
-    And I am on "Course 1" course homepage
+    And I am on the "Discuss A" "book activity" page
     And the embedded discussion is loaded
     When I click "Delete" on the embedded discussion post containing "First post by student one"
     And I click on "Delete" "button" in the "Delete" "dialogue"
@@ -54,7 +57,7 @@ Feature: Editing and deleting embedded discussion posts
   @javascript
   Scenario: Another student does not see Edit or Delete on someone else's post
     Given I log in as "student2"
-    And I am on "Course 1" course homepage
+    And I am on the "Discuss A" "book activity" page
     And the embedded discussion is loaded
     Then I should not see the "Delete" action on the embedded discussion post containing "First post by student one"
     And I should not see the "Edit" action on the embedded discussion post containing "First post by student one"
@@ -62,7 +65,7 @@ Feature: Editing and deleting embedded discussion posts
   @javascript
   Scenario: Teacher can delete any student's post
     Given I log in as "teacher1"
-    And I am on "Course 1" course homepage
+    And I am on the "Discuss A" "book activity" page
     And the embedded discussion is loaded
     When I click "Delete" on the embedded discussion post containing "Reply text from the second student"
     And I click on "Delete" "button" in the "Delete" "dialogue"
@@ -72,7 +75,7 @@ Feature: Editing and deleting embedded discussion posts
   @javascript
   Scenario: Edit affordance shows the inline editor for the author and Cancel restores the post
     Given I log in as "student1"
-    And I am on "Course 1" course homepage
+    And I am on the "Discuss A" "book activity" page
     And the embedded discussion is loaded
     When I click "Edit" on the embedded discussion post containing "First post by student one"
     Then "[data-action='cancel-edit']" "css_element" should exist

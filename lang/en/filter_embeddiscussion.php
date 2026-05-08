@@ -32,6 +32,7 @@ $string['anonymousnotice'] = 'Your posts will be anonymous to other students.';
 $string['anonymousnoticemanager'] = 'Student posts will appear as anonymous to other students.';
 $string['befirsttocomment'] = 'Be the first to comment.';
 $string['cancel'] = 'Cancel';
+$string['cannotbeembeddedhere'] = 'Discussions cannot be embedded here. Only Book chapters are currently supported';
 $string['comment'] = 'Comment';
 $string['comments'] = '{$a} Comments';
 $string['dashboard_empty'] = 'No posts yet in visible discussions.';

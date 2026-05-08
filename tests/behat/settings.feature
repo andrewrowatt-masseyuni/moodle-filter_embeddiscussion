@@ -22,32 +22,38 @@ Feature: Anonymous and locked thread settings driven by filter token keywords
   @javascript
   Scenario: Anonymous keyword on the token shows the anonymity notice to a student
     Given the following "activities" exist:
-      | activity | course | name      | intro                                          | idnumber |
-      | label    | C1     | Discuss A | {embeddeddiscussion:Settings demo,anonymous}   | l1       |
+      | activity | course | name      | idnumber |
+      | book     | C1     | Discuss A | book1    |
+    And the following "mod_book > chapters" exist:
+      | book      | title     | content                                          |
+      | Discuss A | Chapter 1 | {embeddeddiscussion:Settings demo,anonymous}     |
     And the following "filter_embeddiscussion > threads" exist:
       | name          | course | activity |
-      | Settings demo | C1     | l1       |
+      | Settings demo | C1     | book1    |
     And the following "filter_embeddiscussion > posts" exist:
       | thread        | user     | content                |
       | Settings demo | student1 | Hello from a student   |
     When I log in as "student1"
-    And I am on "Course 1" course homepage
+    And I am on the "Discuss A" "book activity" page
     And the embedded discussion is loaded
     Then I should see "Your posts will be anonymous to other students"
 
   @javascript
   Scenario: Locked keyword on the token shows the lock alert and disables the composer for students
     Given the following "activities" exist:
-      | activity | course | name      | intro                                       | idnumber |
-      | label    | C1     | Discuss A | {embeddeddiscussion:Settings demo,locked}   | l1       |
+      | activity | course | name      | idnumber |
+      | book     | C1     | Discuss A | book1    |
+    And the following "mod_book > chapters" exist:
+      | book      | title     | content                                       |
+      | Discuss A | Chapter 1 | {embeddeddiscussion:Settings demo,locked}     |
     And the following "filter_embeddiscussion > threads" exist:
       | name          | course | activity |
-      | Settings demo | C1     | l1       |
+      | Settings demo | C1     | book1    |
     And the following "filter_embeddiscussion > posts" exist:
       | thread        | user     | content                |
       | Settings demo | student1 | Hello from a student   |
     When I log in as "student1"
-    And I am on "Course 1" course homepage
+    And I am on the "Discuss A" "book activity" page
     And the embedded discussion is loaded
     Then I should see "This discussion is locked. New posts and edits are disabled."
     And "[data-action='open-composer'][disabled]" "css_element" should exist
@@ -55,16 +61,19 @@ Feature: Anonymous and locked thread settings driven by filter token keywords
   @javascript
   Scenario: Both keywords in either order with extra spacing apply to the thread
     Given the following "activities" exist:
-      | activity | course | name      | intro                                                        | idnumber |
-      | label    | C1     | Discuss A | {embeddeddiscussion:Settings demo, locked , anonymous ,}     | l1       |
+      | activity | course | name      | idnumber |
+      | book     | C1     | Discuss A | book1    |
+    And the following "mod_book > chapters" exist:
+      | book      | title     | content                                                        |
+      | Discuss A | Chapter 1 | {embeddeddiscussion:Settings demo, locked , anonymous ,}       |
     And the following "filter_embeddiscussion > threads" exist:
       | name          | course | activity |
-      | Settings demo | C1     | l1       |
+      | Settings demo | C1     | book1    |
     And the following "filter_embeddiscussion > posts" exist:
       | thread        | user     | content                |
       | Settings demo | student1 | Hello from a student   |
     When I log in as "student1"
-    And I am on "Course 1" course homepage
+    And I am on the "Discuss A" "book activity" page
     And the embedded discussion is loaded
     Then I should see "Your posts will be anonymous to other students"
     And I should see "This discussion is locked. New posts and edits are disabled."

@@ -2,7 +2,7 @@
 Feature: Embedded discussion filter
   In order to host conversations alongside content
   As a teacher
-  I should be able to embed discussion threads inside labels and pages
+  I should be able to embed discussion threads inside Book chapters
 
   Background:
     Given the following "courses" exist:
@@ -18,8 +18,11 @@ Feature: Embedded discussion filter
       | student1 | C1     | student        |
     And the "embeddiscussion" filter is "on"
     And the following "activities" exist:
-      | activity | course | name      | intro                                  | idnumber |
-      | label    | C1     | Discuss A | {embeddeddiscussion:Course 1 Demo}     | l1       |
+      | activity | course | name      | idnumber |
+      | book     | C1     | Discuss A | book1    |
+    And the following "mod_book > chapters" exist:
+      | book      | title     | content                              |
+      | Discuss A | Chapter 1 | {embeddeddiscussion:Course 1 Demo}   |
 
   @javascript
   Scenario: Plugin appears in the additional plugins list
@@ -32,6 +35,6 @@ Feature: Embedded discussion filter
   @javascript
   Scenario: Filter renders the placeholder and the JS hydrates the discussion thread
     Given I log in as "student1"
-    And I am on "Course 1" course homepage
+    And I am on the "Discuss A" "book activity" page
     Then "[data-region='filter-embeddiscussion'][data-threadid]" "css_element" should exist
     And "[data-region='embeddisc-root'][data-anonymous='0'][data-locked='0']" "css_element" should exist

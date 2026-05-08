@@ -17,6 +17,18 @@
 namespace filter_embeddiscussion;
 
 /**
+ * Test helper that bypasses page-location gating.
+ */
+class testable_text_filter extends text_filter {
+    /**
+     * @return bool
+     */
+    protected function can_embed_discussions_here(): bool {
+        return true;
+    }
+}
+
+/**
  * Tests for the text filter.
  *
  * @package    filter_embeddiscussion
@@ -40,7 +52,7 @@ final class text_filter_test extends \advanced_testcase {
     public function test_filter_no_token_passes_through(): void {
         $this->resetAfterTest();
         $context = \context_system::instance();
-        $filter = new text_filter($context, []);
+        $filter = new testable_text_filter($context, []);
         $input = '<p>Hello world</p>';
         $this->assertSame($input, $filter->filter($input));
     }
@@ -48,7 +60,7 @@ final class text_filter_test extends \advanced_testcase {
     public function test_filter_replaces_token_with_skeleton(): void {
         $this->resetAfterTest();
         $context = \context_system::instance();
-        $filter = new text_filter($context, []);
+        $filter = new testable_text_filter($context, []);
         $output = $filter->filter('Before {embeddeddiscussion:My thread} after');
         $thread = manager::find_thread('My thread', $context->id);
         $this->assertNotNull($thread);
@@ -66,7 +78,7 @@ final class text_filter_test extends \advanced_testcase {
     public function test_filter_supports_alternate_spelling(): void {
         $this->resetAfterTest();
         $context = \context_system::instance();
-        $filter = new text_filter($context, []);
+        $filter = new testable_text_filter($context, []);
         $output = $filter->filter('{embeddiscussion:Alt}');
         $thread = manager::find_thread('Alt', $context->id);
         $this->assertNotNull($thread);
@@ -80,7 +92,7 @@ final class text_filter_test extends \advanced_testcase {
         $SITE->fullname = 'Acceptance test site';
         $SITE->shortname = 'Acceptance test site';
         $context = \context_system::instance();
-        $filter = new text_filter($context, []);
+        $filter = new testable_text_filter($context, []);
         $filter->filter('{embeddiscussion:lesson-2}');
         $thread = manager::find_thread('lesson-2', $context->id);
         $this->assertNotNull($thread);
@@ -90,7 +102,7 @@ final class text_filter_test extends \advanced_testcase {
     public function test_filter_handles_multiple_tokens(): void {
         $this->resetAfterTest();
         $context = \context_system::instance();
-        $filter = new text_filter($context, []);
+        $filter = new testable_text_filter($context, []);
         $output = $filter->filter('{embeddeddiscussion:A} mid {embeddeddiscussion:B}');
         $this->assertSame(2, substr_count($output, 'data-region="filter-embeddiscussion"'));
         $threada = manager::find_thread('A', $context->id);
@@ -107,7 +119,7 @@ final class text_filter_test extends \advanced_testcase {
         $course = $this->getDataGenerator()->create_course();
         $PAGE->set_course($course);
         $context = \context_course::instance($course->id);
-        $filter = new text_filter($context, []);
+        $filter = new testable_text_filter($context, []);
         $output = $filter->filter('{embeddeddiscussion:latestposts}');
         $this->assertStringContainsString('data-region="filter-embeddiscussion-dashboard"', $output);
         $this->assertStringContainsString('data-courseid="' . (int)$course->id . '"', $output);
@@ -116,7 +128,7 @@ final class text_filter_test extends \advanced_testcase {
     public function test_filter_ignores_empty_name(): void {
         $this->resetAfterTest();
         $context = \context_system::instance();
-        $filter = new text_filter($context, []);
+        $filter = new testable_text_filter($context, []);
         $input = '{embeddeddiscussion:}';
         $this->assertSame($input, $filter->filter($input));
     }
@@ -128,7 +140,7 @@ final class text_filter_test extends \advanced_testcase {
         $SITE->fullname = 'Acceptance test site';
         $SITE->shortname = 'Acceptance test site';
         $context = \context_system::instance();
-        $filter = new text_filter($context, []);
+        $filter = new testable_text_filter($context, []);
         $output = $filter->filter('Before {embeddiscussion} after');
         $thread = manager::find_thread('course-course-1', $context->id);
         $this->assertNotNull($thread);
@@ -146,7 +158,7 @@ final class text_filter_test extends \advanced_testcase {
         $SITE->fullname = 'Acceptance test site';
         $SITE->shortname = 'Acceptance test site';
         $context = \context_system::instance();
-        $filter = new text_filter($context, []);
+        $filter = new testable_text_filter($context, []);
         $output = $filter->filter('{embeddiscussion,anonymous,locked}');
         $thread = manager::find_thread('course-course-1', $context->id);
         $this->assertNotNull($thread);
@@ -163,7 +175,7 @@ final class text_filter_test extends \advanced_testcase {
         $SITE->fullname = 'Acceptance test site';
         $SITE->shortname = 'Acceptance test site';
         $context = \context_system::instance();
-        $filter = new text_filter($context, []);
+        $filter = new testable_text_filter($context, []);
         $output = $filter->filter('{embeddeddiscussion}');
         $thread = manager::find_thread('course-course-1', $context->id);
         $this->assertNotNull($thread);
@@ -176,7 +188,7 @@ final class text_filter_test extends \advanced_testcase {
         $this->resetAfterTest();
         $PAGE->set_title('', false);
         $context = \context_system::instance();
-        $filter = new text_filter($context, []);
+        $filter = new testable_text_filter($context, []);
         $input = '{embeddiscussion,anon}';
         $this->assertSame($input, $filter->filter($input));
     }
@@ -188,7 +200,7 @@ final class text_filter_test extends \advanced_testcase {
         $SITE->fullname = 'Acceptance test site';
         $SITE->shortname = 'Acceptance test site';
         $context = \context_system::instance();
-        $filter = new text_filter($context, []);
+        $filter = new testable_text_filter($context, []);
         $output = $filter->filter('{embeddiscussion:anon}');
         $thread = manager::find_thread('course-course-1', $context->id);
         $this->assertNotNull($thread);
@@ -205,7 +217,7 @@ final class text_filter_test extends \advanced_testcase {
         $SITE->fullname = 'Acceptance test site';
         $SITE->shortname = 'Acceptance test site';
         $context = \context_system::instance();
-        $filter = new text_filter($context, []);
+        $filter = new testable_text_filter($context, []);
         $output = $filter->filter('{embeddiscussion:locked,anon}');
         $thread = manager::find_thread('course-course-1', $context->id);
         $this->assertNotNull($thread);
@@ -218,7 +230,7 @@ final class text_filter_test extends \advanced_testcase {
     public function test_filter_persists_anonymous_and_locked_settings_server_side(): void {
         $this->resetAfterTest();
         $context = \context_system::instance();
-        $filter = new text_filter($context, []);
+        $filter = new testable_text_filter($context, []);
         $output = $filter->filter('{embeddeddiscussion:Demo,anonymous,locked}');
         $thread = manager::find_thread('Demo', $context->id);
         $this->assertNotNull($thread);
@@ -397,7 +409,7 @@ final class text_filter_test extends \advanced_testcase {
         $SITE->fullname = 'Acceptance test site';
         $SITE->shortname = 'Acceptance test site';
         $context = \context_system::instance();
-        $filter = new text_filter($context, []);
+        $filter = new testable_text_filter($context, []);
         $output = $filter->filter('Before [[filter_disqus]] after');
         $thread = manager::find_thread('Course: Course 1', $context->id);
         $this->assertNotNull($thread);
@@ -413,7 +425,7 @@ final class text_filter_test extends \advanced_testcase {
         $SITE->fullname = 'Acceptance test site';
         $SITE->shortname = 'Acceptance test site';
         $context = \context_system::instance();
-        $filter = new text_filter($context, []);
+        $filter = new testable_text_filter($context, []);
         $output = $filter->filter('[[filter_disqus:book-23]]');
         $thread = manager::find_thread('Course: Course 1 (book-23)', $context->id);
         $this->assertNotNull($thread);
@@ -428,7 +440,7 @@ final class text_filter_test extends \advanced_testcase {
         $SITE->fullname = 'Acceptance test site';
         $SITE->shortname = 'Acceptance test site';
         $context = \context_system::instance();
-        $filter = new text_filter($context, []);
+        $filter = new testable_text_filter($context, []);
         $output = $filter->filter('{comments}');
         $thread = manager::find_thread('Course: Course 1', $context->id);
         $this->assertNotNull($thread);
@@ -442,10 +454,72 @@ final class text_filter_test extends \advanced_testcase {
         $SITE->fullname = 'Acceptance test site';
         $SITE->shortname = 'Acceptance test site';
         $context = \context_system::instance();
-        $filter = new text_filter($context, []);
+        $filter = new testable_text_filter($context, []);
         $input = 'Before [[filter_disqus]] and {comments} after';
         $output = $filter->filter($input);
         $this->assertSame($input, $output);
+    }
+
+    public function test_filter_replaces_token_outside_book_chapter_for_non_editor(): void {
+        $this->resetAfterTest();
+        $context = \context_system::instance();
+        $filter = new text_filter($context, []);
+        $output = $filter->filter('Before {embeddeddiscussion:My thread} after');
+
+        $this->assertStringNotContainsString('data-region="filter-embeddiscussion-unsupported"', $output);
+        $this->assertStringNotContainsString(get_string('cannotbeembeddedhere', 'filter_embeddiscussion'), $output);
+        $this->assertSame('Before  after', $output);
+        $this->assertNull(manager::find_thread('My thread', $context->id));
+    }
+
+    public function test_filter_replaces_each_token_outside_book_chapter_for_non_editor(): void {
+        $this->resetAfterTest();
+        $context = \context_system::instance();
+        $filter = new text_filter($context, []);
+        $output = $filter->filter('{embeddeddiscussion:A} and {embeddiscussion:B}');
+
+        $this->assertSame(' and ', $output);
+        $this->assertNull(manager::find_thread('A', $context->id));
+        $this->assertNull(manager::find_thread('B', $context->id));
+    }
+
+    public function test_filter_shows_unsupported_notice_to_course_editor(): void {
+        global $PAGE;
+
+        $this->resetAfterTest();
+        $course = $this->getDataGenerator()->create_course();
+        $user = $this->getDataGenerator()->create_user();
+        $this->getDataGenerator()->enrol_user($user->id, $course->id, 'editingteacher');
+        $this->setUser($user);
+
+        $coursecontext = \context_course::instance($course->id);
+        $PAGE->set_course($course);
+        $PAGE->set_context($coursecontext);
+        $filter = new text_filter($coursecontext, []);
+        $output = $filter->filter('Before {embeddeddiscussion:My thread} after');
+
+        $this->assertStringContainsString('data-region="filter-embeddiscussion-unsupported"', $output);
+        $this->assertStringContainsString(get_string('cannotbeembeddedhere', 'filter_embeddiscussion'), $output);
+        $this->assertNull(manager::find_thread('My thread', $coursecontext->id));
+    }
+
+    public function test_filter_renders_dashboard_token_outside_book_context(): void {
+        global $PAGE;
+
+        $this->resetAfterTest();
+        $course = $this->getDataGenerator()->create_course();
+        $user = $this->getDataGenerator()->create_user();
+        $this->getDataGenerator()->enrol_user($user->id, $course->id, 'student');
+        $this->setUser($user);
+
+        $coursecontext = \context_course::instance($course->id);
+        $PAGE->set_course($course);
+        $PAGE->set_context($coursecontext);
+        $filter = new text_filter($coursecontext, []);
+        $output = $filter->filter('{embeddiscussion:dashboard}');
+
+        $this->assertStringContainsString('data-region="filter-embeddiscussion-dashboard"', $output);
+        $this->assertStringContainsString('data-courseid="' . (int)$course->id . '"', $output);
     }
 
     /**

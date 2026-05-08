@@ -92,6 +92,38 @@ class text_filter extends \core_filters\text_filter {
             return $text;
         }
 
+        if (!$this->can_embed_discussions_here()) {
+            $showunsupported = $this->can_display_unsupported_notice();
+            $dashboardused = false;
+            $self = $this;
+
+            $text = preg_replace_callback(self::PATTERN, function ($matches) use ($OUTPUT, $showunsupported, &$dashboardused, $self) {
+                $captured = $matches[1] ?? '';
+                $hascolon = ($captured !== '' && $captured[0] === ':');
+                $body = $hascolon ? substr($captured, 1) : $captured;
+
+                if ($hascolon && self::is_course_feed_token($body)) {
+                    $rendered = $self->render_dashboard_placeholder($OUTPUT);
+                    if ($rendered !== null) {
+                        $dashboardused = true;
+                        return $rendered;
+                    }
+                    return $matches[0];
+                }
+
+                if (!$showunsupported) {
+                    return '';
+                }
+                return $OUTPUT->render_from_template('filter_embeddiscussion/cannotbeembeddedhere', []);
+            }, $text);
+
+            if ($dashboardused) {
+                $PAGE->requires->js_call_amd('filter_embeddiscussion/dashboard', 'init');
+            }
+
+            return $text;
+        }
+
         // Capture the host page's URL so threads can be linked back to where they live.
         // Skip if the page never called set_url(): the magic getter would otherwise emit a
         // DEBUG_DEVELOPER notice and fall back to a guessed $FULLME we don't want to store.
@@ -368,6 +400,75 @@ class text_filter extends \core_filters\text_filter {
     protected static function is_course_feed_token(string $body): bool {
         $value = trim($body);
         return strcasecmp($value, 'dashboard') === 0 || strcasecmp($value, 'latestposts') === 0;
+    }
+
+    /**
+     * Whether embedded discussions can be rendered in the current page context.
+     *
+     * @return bool true only for Book chapter view pages
+     */
+    protected function can_embed_discussions_here(): bool {
+        global $PAGE;
+
+        if (!isset($PAGE) || !is_object($PAGE)) {
+            return false;
+        }
+
+        // moodle_page uses magic properties; isset() can be unreliable here.
+        try {
+            $pagecontext = $PAGE->context;
+        } catch (\Throwable $e) {
+            return false;
+        }
+
+        if (!is_object($pagecontext) || empty($pagecontext->id)) {
+            return false;
+        }
+
+        list($context, $course, $cm) = get_context_info_array($pagecontext->id);
+
+        if (!isset($cm) || !is_object($cm)) {
+            return false;
+        }
+
+        if (($cm->modname ?? '') !== 'book') {
+            return false;
+        }
+
+        // moodle_page uses magic properties; isset() can be unreliable here.
+        try {
+            $url = $PAGE->url;
+        } catch (\Throwable $e) {
+            return false;
+        }
+
+        return $url->get_path() === '/mod/book/view.php';
+    }
+
+    /**
+     * Whether the current user should see unsupported-location guidance.
+     *
+     * @return bool true when user can edit the enclosing course
+     */
+    protected function can_display_unsupported_notice(): bool {
+        global $PAGE;
+
+        $coursectx = $this->context->get_course_context(false);
+        if (!$coursectx && isset($PAGE) && is_object($PAGE)) {
+            try {
+                $pagecontext = $PAGE->context;
+            } catch (\Throwable $e) {
+                $pagecontext = null;
+            }
+            if (is_object($pagecontext)) {
+                $coursectx = $pagecontext->get_course_context(false);
+            }
+        }
+        if (!$coursectx) {
+            return false;
+        }
+
+        return has_capability('moodle/course:manageactivities', $coursectx);
     }
 
     /**

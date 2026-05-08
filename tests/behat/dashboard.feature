@@ -18,16 +18,20 @@ Feature: Embedded discussion dashboard
       | student1 | C1     | student        |
     And the "embeddiscussion" filter is "on"
     And the following "activities" exist:
-      | activity | course | name          | intro                              | idnumber |
-      | label    | C1     | Visible chat  | {embeddeddiscussion:Visible chat}  | l1       |
-      | label    | C1     | Activity feed | {embeddiscussion:latestposts}      | dash     |
+      | activity | course | name               | idnumber    |
+      | book     | C1     | Visible chat book  | visiblebook |
+      | book     | C1     | Activity feed book | dashbook    |
+    And the following "mod_book > chapters" exist:
+      | book               | title              | content                            |
+      | Visible chat book  | Visible chapter    | {embeddeddiscussion:Visible chat}  |
+      | Activity feed book | Dashboard chapter  | {embeddiscussion:latestposts}      |
     # Backdate the student's last visit so posts created next pass the cutoff
     # but the dashboard page-load doesn't bump the timestamp forward (the
     # debounce is 60 seconds in user_accesstime_log).
     And user "student1" last accessed course "C1" "30" seconds ago
     And the following "filter_embeddiscussion > threads" exist:
       | name         | course | activity |
-      | Visible chat | C1     | l1       |
+      | Visible chat | C1     | visiblebook |
     And the following "filter_embeddiscussion > posts" exist:
       | thread       | user     | content                            |
       | Visible chat | teacher1 | Welcome aboard, feel free to chat. |
@@ -36,7 +40,7 @@ Feature: Embedded discussion dashboard
   @javascript
   Scenario: Dashboard lists posts created since the student's last visit
     Given I log in as "student1"
-    And I am on "Course 1" course homepage
+    And I am on the "Activity feed book" "book activity" page
     And the embedded discussion dashboard is loaded
     Then I should see "Visible chat"
     And I should see "Welcome aboard"
@@ -44,16 +48,19 @@ Feature: Embedded discussion dashboard
   @javascript
   Scenario: Dashboard hides posts in modules the student cannot see
     Given the following "activities" exist:
-      | activity | course | name         | intro                            | idnumber | visible |
-      | label    | C1     | Hidden chat  | {embeddeddiscussion:Hidden chat} | l2       | 0       |
+      | activity | course | name              | idnumber   | visible |
+      | book     | C1     | Hidden chat book  | hiddenbook | 0       |
+    And the following "mod_book > chapters" exist:
+      | book             | title           | content                            |
+      | Hidden chat book | Hidden chapter  | {embeddeddiscussion:Hidden chat}   |
     And the following "filter_embeddiscussion > threads" exist:
       | name        | course | activity |
-      | Hidden chat | C1     | l2       |
+      | Hidden chat | C1     | hiddenbook |
     And the following "filter_embeddiscussion > posts" exist:
       | thread      | user     | content                          |
       | Hidden chat | teacher1 | This message is in a hidden mod. |
     And I log in as "student1"
-    And I am on "Course 1" course homepage
+    And I am on the "Activity feed book" "book activity" page
     And the embedded discussion dashboard is loaded
     Then I should see "Visible chat"
     And I should not see "Hidden chat"

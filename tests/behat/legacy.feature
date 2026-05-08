@@ -26,29 +26,38 @@ Feature: Legacy filter_disqus and {comments} tokens are accepted as drop-in repl
   @javascript
   Scenario: [[filter_disqus]] renders a placeholder using the page name with the site name stripped
     Given the following "activities" exist:
-      | activity | course | name      | intro              | idnumber |
-      | label    | C1     | Discuss A | [[filter_disqus]]  | l1       |
+      | activity | course | name      | idnumber |
+      | book     | C1     | Discuss A | book1    |
+    And the following "mod_book > chapters" exist:
+      | book      | title     | content            |
+      | Discuss A | Chapter 1 | [[filter_disqus]]  |
     When I log in as "student1"
-    And I am on "Course 1" course homepage
+    And I am on the "Discuss A" "book activity" page
     Then "[data-region='filter-embeddiscussion'][data-threadid]" "css_element" should exist
     And "[data-region='embeddisc-root'][data-anonymous='0'][data-locked='0']" "css_element" should exist
 
   @javascript
   Scenario: [[filter_disqus:url_segment]] renders a placeholder with the URL segment in parentheses
     Given the following "activities" exist:
-      | activity | course | name      | intro                       | idnumber |
-      | label    | C1     | Discuss A | [[filter_disqus:book-23]]   | l1       |
+      | activity | course | name      | idnumber |
+      | book     | C1     | Discuss A | book1    |
+    And the following "mod_book > chapters" exist:
+      | book      | title     | content                     |
+      | Discuss A | Chapter 1 | [[filter_disqus:book-23]]   |
     When I log in as "student1"
-    And I am on "Course 1" course homepage
+    And I am on the "Discuss A" "book activity" page
     Then "[data-region='filter-embeddiscussion'][data-threadid]" "css_element" should exist
     And "[data-region='embeddisc-root']" "css_element" should exist
 
   @javascript
   Scenario: {comments} renders a placeholder using the page name with the site name stripped
     Given the following "activities" exist:
-      | activity | course | name      | intro       | idnumber |
-      | label    | C1     | Discuss A | {comments}  | l1       |
+      | activity | course | name      | idnumber |
+      | book     | C1     | Discuss A | book1    |
+    And the following "mod_book > chapters" exist:
+      | book      | title     | content     |
+      | Discuss A | Chapter 1 | {comments}  |
     When I log in as "student1"
-    And I am on "Course 1" course homepage
+    And I am on the "Discuss A" "book activity" page
     Then "[data-region='filter-embeddiscussion'][data-threadid]" "css_element" should exist
     And "[data-region='embeddisc-root']" "css_element" should exist
