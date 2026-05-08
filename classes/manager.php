@@ -669,12 +669,15 @@ class manager {
             'courseid' => $courseid,
         ]) ?: 0);
 
-        $contextids = [];
+        // Include both module contexts (label/page/book, etc.) and course
+        // context threads (for section summary discussions).
+        $contextids = [(int)\context_course::instance($courseid)->id];
         foreach ($modinfo->cms as $cm) {
             if ($cm->uservisible) {
                 $contextids[] = (int)$cm->context->id;
             }
         }
+        $contextids = array_values(array_unique($contextids));
 
         if (empty($contextids)) {
             return self::empty_dashboard_payload($lastaccess);

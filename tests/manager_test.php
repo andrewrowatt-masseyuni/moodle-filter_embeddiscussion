@@ -178,6 +178,7 @@ final class manager_test extends \advanced_testcase {
         global $DB;
         $this->resetAfterTest();
         $course = $this->getDataGenerator()->create_course();
+        $coursecontext = \context_course::instance($course->id);
         $student = $this->getDataGenerator()->create_and_enrol($course, 'student');
         $teacher = $this->getDataGenerator()->create_and_enrol($course, 'editingteacher');
 
@@ -208,18 +209,27 @@ final class manager_test extends \advanced_testcase {
             '/mod/label/view.php?id=' . $hiddenlabel->cmid,
             'Hidden label'
         );
+        $sectionthread = manager::get_or_create_thread(
+            'section-thread',
+            $coursecontext,
+            '/course/view.php?id=' . $course->id,
+            'Section summary'
+        );
 
         $this->setUser($teacher);
         $oldpost = manager::create_post($visiblethread, $visiblecontext, 0, 'Old visible post', $teacher->id);
         $newpost = manager::create_post($visiblethread, $visiblecontext, 0, 'New visible post', $teacher->id);
+        $sectionpost = manager::create_post($sectionthread, $coursecontext, 0, 'Section summary post', $teacher->id);
         manager::create_post($hiddenthread, $hiddencontext, 0, 'Hidden post', $teacher->id);
 
         $now = time();
         $lastaccess = $now - 100;
         $DB->set_field('filter_embeddiscussion_post', 'timecreated', $lastaccess - 50, ['id' => $oldpost->id]);
         $DB->set_field('filter_embeddiscussion_post', 'timecreated', $lastaccess + 50, ['id' => $newpost->id]);
+        $DB->set_field('filter_embeddiscussion_post', 'timecreated', $lastaccess + 25, ['id' => $sectionpost->id]);
         $DB->set_field('filter_embeddiscussion_post', 'timemodified', $lastaccess - 50, ['id' => $oldpost->id]);
         $DB->set_field('filter_embeddiscussion_post', 'timemodified', $lastaccess + 50, ['id' => $newpost->id]);
+        $DB->set_field('filter_embeddiscussion_post', 'timemodified', $lastaccess + 25, ['id' => $sectionpost->id]);
         $DB->insert_record('user_lastaccess', (object)[
             'userid' => $student->id,
             'courseid' => $course->id,
@@ -229,14 +239,18 @@ final class manager_test extends \advanced_testcase {
         $this->setUser($student);
         $view = manager::get_dashboard_view((int)$course->id, (int)$student->id);
 
-        $this->assertSame(2, $view['postcount']);
-        $this->assertCount(2, $view['posts']);
+        $this->assertSame(3, $view['postcount']);
+        $this->assertCount(3, $view['posts']);
         $this->assertSame((int)$newpost->id, (int)$view['posts'][0]['id']);
-        $this->assertSame((int)$oldpost->id, (int)$view['posts'][1]['id']);
+        $this->assertSame((int)$sectionpost->id, (int)$view['posts'][1]['id']);
+        $this->assertSame((int)$oldpost->id, (int)$view['posts'][2]['id']);
         $this->assertTrue($view['posts'][0]['isunread']);
-        $this->assertFalse($view['posts'][1]['isunread']);
+        $this->assertTrue($view['posts'][1]['isunread']);
+        $this->assertFalse($view['posts'][2]['isunread']);
         $this->assertSame('Visible label', $view['posts'][0]['threadname']);
+        $this->assertSame('Section summary', $view['posts'][1]['threadname']);
         $this->assertStringContainsString('#embeddisc-post-' . (int)$newpost->id, $view['posts'][0]['posturl']);
+        $this->assertStringContainsString('#embeddisc-post-' . (int)$sectionpost->id, $view['posts'][1]['posturl']);
         $this->assertStringNotContainsString('Hidden post', json_encode($view));
     }
 }
