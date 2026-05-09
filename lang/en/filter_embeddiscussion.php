@@ -25,7 +25,6 @@
 
 defined('MOODLE_INTERNAL') || die();
 
-$string['ago'] = 'ago';
 $string['allposts'] = 'All posts';
 $string['anonymous'] = 'Anonymous';
 $string['anonymousnotice'] = 'Your posts will be anonymous to other students.';
@@ -79,6 +78,7 @@ $string['privacy:metadata:vote:timecreated'] = 'When the vote was cast.';
 $string['privacy:metadata:vote:userid'] = 'The voting user.';
 $string['privacy:metadata:vote:vote'] = '+1 or -1.';
 $string['rateandcomment'] = 'Rate and comment';
+$string['relativetime'] = '{$a} ago';
 $string['reply'] = 'Reply';
 $string['replytopost'] = 'Reply to post';
 $string['save'] = 'Save';

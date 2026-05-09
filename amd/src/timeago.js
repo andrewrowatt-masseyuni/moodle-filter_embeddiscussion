@@ -40,7 +40,10 @@ const UNIT_FALLBACK_LABELS = {
 const UNIT_FORMATTERS = new Map();
 
 let started = false;
-let agosuffix = '';
+// Localised template for the relative time string. Defaults to "{$a}" so that, before the
+// async lang-string fetch resolves (or if it fails), the value renders bare without an
+// English-only "ago" stitched on. Populated by startTicker().
+let relativeTemplate = '{$a}';
 
 /**
  * Format a duration value with a locale-aware unit label when possible.
@@ -119,7 +122,7 @@ const tick = () => {
             return;
         }
         const relative = format(now - ts);
-        el.textContent = (relative === 'now' || !agosuffix) ? relative : `${relative} ${agosuffix}`;
+        el.textContent = (relative === 'now') ? relative : relativeTemplate.replace('{$a}', relative);
     });
 };
 
@@ -133,9 +136,12 @@ export const startTicker = async() => {
     started = true;
 
     try {
-        agosuffix = await getString('ago', 'filter_embeddiscussion');
+        // Fetch the template by passing the literal "{$a}" placeholder through; core/str
+        // does a single non-recursive replace, so we get the raw template back to reuse
+        // per tick rather than calling getString per element.
+        relativeTemplate = await getString('relativetime', 'filter_embeddiscussion', '{$a}');
     } catch {
-        agosuffix = '';
+        relativeTemplate = '{$a}';
     }
 
     setInterval(tick, 30 * 1000);

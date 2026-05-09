@@ -38,6 +38,7 @@ $functions = [
         'type' => 'write',
         'ajax' => true,
         'loginrequired' => true,
+        'capabilities' => 'filter/embeddiscussion:createpost',
     ],
     'filter_embeddiscussion_edit_post' => [
         'classname' => 'filter_embeddiscussion\external\edit_post',
@@ -45,6 +46,7 @@ $functions = [
         'type' => 'write',
         'ajax' => true,
         'loginrequired' => true,
+        'capabilities' => 'filter/embeddiscussion:editownpost,filter/embeddiscussion:manageposts',
     ],
     'filter_embeddiscussion_delete_post' => [
         'classname' => 'filter_embeddiscussion\external\delete_post',
@@ -52,6 +54,7 @@ $functions = [
         'type' => 'write',
         'ajax' => true,
         'loginrequired' => true,
+        'capabilities' => 'filter/embeddiscussion:deleteownpost,filter/embeddiscussion:deleteanypost',
     ],
     'filter_embeddiscussion_vote_post' => [
         'classname' => 'filter_embeddiscussion\external\vote_post',
@@ -59,6 +62,7 @@ $functions = [
         'type' => 'write',
         'ajax' => true,
         'loginrequired' => true,
+        'capabilities' => 'filter/embeddiscussion:createpost',
     ],
     'filter_embeddiscussion_get_dashboard' => [
         'classname' => 'filter_embeddiscussion\external\get_dashboard',

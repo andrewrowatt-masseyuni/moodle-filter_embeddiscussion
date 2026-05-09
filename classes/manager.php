@@ -717,7 +717,11 @@ class manager {
             'edited' => (bool)$post->edited,
             'timecreated' => (int)$post->timecreated,
             'timecreatediso' => userdate($post->timecreated, get_string('strftimedatetime', 'langconfig')),
-            'timecreatedrelative' => format_time(time() - $post->timecreated) . ' ' . get_string('ago', 'filter_embeddiscussion'),
+            'timecreatedrelative' => get_string(
+                'relativetime',
+                'filter_embeddiscussion',
+                format_time(time() - $post->timecreated)
+            ),
             'authorname' => $authorname,
             'authorhandle' => $handle,
             'authorrole' => $rolelabel,
@@ -868,11 +872,16 @@ class manager {
      * @return string
      */
     protected static function thread_display_name(\stdClass $thread): string {
-        $threadname = trim((string)($thread->threadname ?? ''));
-        if ($threadname !== '') {
-            return $threadname;
+        $name = trim((string)($thread->threadname ?? ''));
+        if ($name === '') {
+            $name = trim((string)($thread->idnumber ?? ''));
         }
-        return trim((string)($thread->idnumber ?? ''));
+        if ($name === '') {
+            return '';
+        }
+        $context = \context::instance_by_id((int)$thread->contextid, IGNORE_MISSING)
+            ?: \context_system::instance();
+        return format_string($name, true, ['context' => $context]);
     }
 
     /**
