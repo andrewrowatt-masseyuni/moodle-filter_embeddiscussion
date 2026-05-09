@@ -79,22 +79,10 @@ class text_filter extends \core_filters\text_filter {
             return $text;
         }
 
-        // Capture the host page's URL so threads can be linked back to where they live.
-        // Skip if the page never called set_url(): the magic getter would otherwise emit a
-        // DEBUG_DEVELOPER notice and fall back to a guessed $FULLME we don't want to store.
-        $pageurl = null;
-        try {
-            if (isset($PAGE) && is_object($PAGE) && $PAGE->has_set_url()) {
-                $pageurl = $PAGE->url->out(false);
-            }
-        } catch (\Throwable $e) {
-            $pageurl = null;
-        }
-
         $dashboardused = false;
         $self = $this;
 
-        $text = preg_replace_callback(self::PATTERN, function ($matches) use ($self, $OUTPUT, $pageurl, &$dashboardused) {
+        $text = preg_replace_callback(self::PATTERN, function ($matches) use ($self, $OUTPUT, &$dashboardused) {
             $tokentype = strtolower($matches[1] ?? 'discussion');
             $body = self::sanitise_thread_name($matches[2] ?? '');
             $anonymous = ($tokentype === 'anondiscussion' || $tokentype === 'anonymousdiscussion');
@@ -108,7 +96,7 @@ class text_filter extends \core_filters\text_filter {
                 return $matches[0];
             }
 
-            $rendered = $self->render_thread_placeholder($body, $anonymous, $OUTPUT, $pageurl);
+            $rendered = $self->render_thread_placeholder($body, $anonymous, $OUTPUT);
             return $rendered ?? $matches[0];
         }, $text);
 
@@ -227,15 +215,13 @@ class text_filter extends \core_filters\text_filter {
      * @param string $name explicit thread name from the token body
      * @param bool $anonymous whether anonymous mode should be applied
      * @param object $output the page output renderer
-     * @param string|null $pageurl URL of the host page, for back-linking
      * @return string|null rendered HTML, empty string to remove token, or null
      *                     to keep the original token text
      */
     protected function render_thread_placeholder(
         string $name,
         bool $anonymous,
-        $output,
-        ?string $pageurl
+        $output
     ): ?string {
         $threadname = self::sanitise_thread_name($name);
         if ($threadname === '') {
@@ -255,7 +241,7 @@ class text_filter extends \core_filters\text_filter {
         // Resolve the thread server-side so the browser only learns the thread id.
         // Anonymous mode is token-authored and never trusted from the client.
         try {
-            $thread = manager::get_or_create_thread($threadname, $this->context, $pageurl, $threadname);
+            $thread = manager::get_or_create_thread($threadname, $this->context, $threadname);
             $thread = manager::sync_settings_from_token($thread, [
                 'anonymous' => $anonymous,
             ]);

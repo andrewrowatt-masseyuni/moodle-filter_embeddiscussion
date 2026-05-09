@@ -14,7 +14,6 @@
         <FIELD NAME="courseid" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" COMMENT="Course where the thread lives (0 if site)"/>
         <FIELD NAME="anonymous" TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="0" COMMENT="1 = anonymous handles for students"/>
         <FIELD NAME="handleoffset" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" COMMENT="Random offset into the handle master list"/>
-        <FIELD NAME="pageurl" TYPE="text" NOTNULL="false" COMMENT="Last seen URL of the page that hosts this thread"/>
         <FIELD NAME="timecreated" TYPE="int" LENGTH="10" NOTNULL="true"/>
         <FIELD NAME="timemodified" TYPE="int" LENGTH="10" NOTNULL="true"/>
       </FIELDS>

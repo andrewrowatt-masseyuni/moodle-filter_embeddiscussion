@@ -67,29 +67,76 @@ Feature: Embedded discussion dashboard
     And I should not see "This message is in a hidden mod"
 
   @javascript
-  Scenario: Dashboard includes posts from section summaries, labels, and pages
-    Given the following "activities" exist:
-      | activity | course | name                    | idnumber   | intro                                     | content                                |
-      | label    | C1     | Section news label      | labeldash  | Label intro {discussion:Label updates}    |                                        |
-      | page     | C1     | Section news page       | pagedash   | Page intro                                | Page body {discussion:Page updates}    |
-    And I log in as "teacher1"
+  Scenario: Dashboard links section summary posts back to the course homepage
+    Given I log in as "teacher1"
     And I am on "Course 1" course homepage with editing mode on
     And I edit the section "1" and I fill the form with:
       | Description | Summary intro {discussion:Section updates} |
-    And I log out
     And the following "filter_embeddiscussion > threads" exist:
-      | name            | course | activity  |
-      | Label updates   | C1     | labeldash |
-      | Page updates    | C1     | pagedash  |
-      | Section updates | C1     |           |
+      | name            | course | activity |
+      | Section updates | C1     |          |
     And the following "filter_embeddiscussion > posts" exist:
       | thread          | user     | content                               |
-      | Label updates   | teacher1 | Label discussion dashboard message    |
-      | Page updates    | teacher1 | Page discussion dashboard message     |
       | Section updates | teacher1 | Section discussion dashboard message  |
+    And I am on "Course 1" course homepage
+    And the embedded discussion is loaded
+    And I log out
+    And I log in as "student1"
+    And I am on the "Activity feed book" "book activity" page
+    And the embedded discussion dashboard is loaded
+    Then I should see "Section discussion dashboard message"
+    When I follow "Section discussion dashboard message"
+    And the embedded discussion is loaded
+    Then the url should match "/course/view\.php\?id=[0-9]+"
+    And I should see "Summary intro"
+    And I should see "Section discussion dashboard message"
+
+  @javascript
+  Scenario: Dashboard links label posts back to the course homepage
+    Given the following "activities" exist:
+      | activity | course | name                | idnumber  | intro                                  |
+      | label    | C1     | Section news label  | labeldash | Label intro {discussion:Label updates} |
+    And the following "filter_embeddiscussion > threads" exist:
+      | name          | course | activity  |
+      | Label updates | C1     | labeldash |
+    And the following "filter_embeddiscussion > posts" exist:
+      | thread        | user     | content                             |
+      | Label updates | teacher1 | Label discussion dashboard message  |
+    And I log in as "teacher1"
+    And I am on "Course 1" course homepage
+    And the embedded discussion is loaded
+    And I log out
     And I log in as "student1"
     And I am on the "Activity feed book" "book activity" page
     And the embedded discussion dashboard is loaded
     Then I should see "Label discussion dashboard message"
+    When I follow "Label discussion dashboard message"
+    And the embedded discussion is loaded
+    Then the url should match "/course/view\.php\?id=[0-9]+"
+    And I should see "Label intro"
+    And I should see "Label discussion dashboard message"
+
+  @javascript
+  Scenario: Dashboard links page posts back to the page activity
+    Given the following "activities" exist:
+      | activity | course | name               | idnumber | intro     | content                              |
+      | page     | C1     | Section news page  | pagedash | Page desc | Page body {discussion:Page updates}  |
+    And the following "filter_embeddiscussion > threads" exist:
+      | name         | course | activity |
+      | Page updates | C1     | pagedash |
+    And the following "filter_embeddiscussion > posts" exist:
+      | thread       | user     | content                            |
+      | Page updates | teacher1 | Page discussion dashboard message  |
+    And I log in as "teacher1"
+    And I am on the "Section news page" "page activity" page
+    And the embedded discussion is loaded
+    And I log out
+    And I log in as "student1"
+    And I am on the "Activity feed book" "book activity" page
+    And the embedded discussion dashboard is loaded
+    Then I should see "Page discussion dashboard message"
+    When I follow "Page discussion dashboard message"
+    And the embedded discussion is loaded
+    Then the url should match "/mod/page/view\.php\?id=[0-9]+"
+    And I should see "Page body"
     And I should see "Page discussion dashboard message"
-    And I should see "Section discussion dashboard message"

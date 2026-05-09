@@ -74,8 +74,6 @@ class manager {
      *
      * @param string $idnumber
      * @param \context $context
-     * @param string|null $pageurl URL of the page hosting the thread; refreshed on each
-     *                             call so the stored value tracks the current location.
      * @param string|null $threadname thread name at token-processing time; refreshed
      *                                on each call when available.
      * @return \stdClass
@@ -83,7 +81,6 @@ class manager {
     public static function get_or_create_thread(
         string $idnumber,
         \context $context,
-        ?string $pageurl = null,
         ?string $threadname = null
     ): \stdClass {
         global $DB;
@@ -98,10 +95,6 @@ class manager {
         $existing = self::find_thread($idnumber, $context->id);
         if ($existing) {
             $changed = false;
-            if ($pageurl !== null && $pageurl !== '' && (string)($existing->pageurl ?? '') !== $pageurl) {
-                $existing->pageurl = $pageurl;
-                $changed = true;
-            }
             if ($threadname !== '' && (string)($existing->{$threadnamefield} ?? '') !== $threadname) {
                 $existing->{$threadnamefield} = $threadname;
                 $changed = true;
@@ -131,7 +124,6 @@ class manager {
             'courseid' => $courseid,
             'anonymous' => 0,
             'handleoffset' => random_int(0, $masterlistsize - 1),
-            'pageurl' => ($pageurl !== null && $pageurl !== '') ? $pageurl : null,
             'timecreated' => $now,
             'timemodified' => $now,
         ];
@@ -743,7 +735,6 @@ class manager {
 
         $context = \context::instance_by_id((int)$thread->contextid);
         $canviewfullnames = has_capability('moodle/site:viewfullnames', $context);
-        $pageurl = (string)($thread->pageurl ?? '');
 
         $postsout = [];
         foreach ($posts as $p) {
@@ -758,12 +749,11 @@ class manager {
                 false,
                 $renderer
             );
-            $postsout[] = self::dashboard_post_from_view($view, $thread, (int)$p->id, $pageurl, $lastaccess);
+            $postsout[] = self::dashboard_post_from_view($view, $thread, (int)$p->id, $lastaccess);
         }
         return [
             'threadid' => (int)$thread->id,
             'name' => self::thread_display_name($thread),
-            'pageurl' => $pageurl,
             'postcount' => count($postsout),
             'posts' => $postsout,
         ];
@@ -828,13 +818,11 @@ class manager {
     /**
      * Convert the rich per-post view payload returned by build_post_view into
      * the lighter shape the dashboard expects: drops the interactive fields
-     * (votes, parentid, can-edit/delete/reply) and adds a posturl that deep-
-     * links back to the post in its hosting page.
+     * (votes, parentid, can-edit/delete/reply) and adds a posturl anchor.
      *
      * @param array $view a row produced by self::build_post_view
      * @param \stdClass $thread thread record
      * @param int $postid the post's id (used to compose the anchor)
-     * @param string $pageurl the host page URL stored on the thread
      * @param int $lastaccess the viewer's last course access timestamp
      * @return array
      */
@@ -842,7 +830,6 @@ class manager {
         array $view,
         \stdClass $thread,
         int $postid,
-        string $pageurl,
         int $lastaccess
     ): array {
         unset(
@@ -857,7 +844,7 @@ class manager {
         $view['threadid'] = (int)$thread->id;
         $view['threadname'] = self::thread_display_name($thread);
         $view['isunread'] = ((int)$view['timecreated'] > $lastaccess);
-        $view['posturl'] = ($pageurl !== '') ? $pageurl . '#embeddisc-post-' . $postid : '';
+        $view['posturl'] = '#embeddisc-post-' . $postid;
         return $view;
     }
 }

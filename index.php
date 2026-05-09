@@ -40,16 +40,6 @@ if ($action === 'view' && $threadid) {
             'filter/embeddiscussion:managethreads',
             $thread->courseid ? context_course::instance($thread->courseid) : context_system::instance()
         );
-        // Prefer the host page URL captured at filter time; fall back to the context URL.
-        if (!empty($thread->pageurl)) {
-            redirect(
-                new moodle_url(
-                    $thread->pageurl,
-                    [],
-                    \filter_embeddiscussion\manager::get_thread_uid($thread->id, $thread->contextid)
-                )
-            );
-        }
         // Best-effort redirect to where this thread lives.
         $url = $context->get_url();
         redirect($url);
@@ -67,8 +57,8 @@ if ($courseid) {
 
 require_capability('filter/embeddiscussion:managethreads', $context);
 
-$pageurl = new moodle_url('/filter/embeddiscussion/index.php', ['courseid' => $courseid]);
-$PAGE->set_url($pageurl);
+$indexurl = new moodle_url('/filter/embeddiscussion/index.php', ['courseid' => $courseid]);
+$PAGE->set_url($indexurl);
 $PAGE->set_context($context);
 $PAGE->set_pagelayout($courseid ? 'incourse' : 'admin');
 $PAGE->set_title(get_string('threadsincourse', 'filter_embeddiscussion'));

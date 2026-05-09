@@ -103,7 +103,6 @@ class helper {
             'threads' => new external_multiple_structure(new external_single_structure([
                 'threadid' => new external_value(PARAM_INT, 'Thread id'),
                 'name' => new external_value(PARAM_TEXT, 'Thread name'),
-                'pageurl' => new external_value(PARAM_RAW, 'Host page URL', VALUE_OPTIONAL),
                 'postcount' => new external_value(PARAM_INT, 'Visible posts in this thread'),
                 'posts' => new external_multiple_structure(self::dashboard_post_structure()),
             ])),

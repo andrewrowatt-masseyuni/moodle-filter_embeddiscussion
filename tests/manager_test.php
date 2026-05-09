@@ -54,7 +54,7 @@ final class manager_test extends \advanced_testcase {
         $course = $this->getDataGenerator()->create_course();
         $context = \context_course::instance($course->id);
 
-        $thread = manager::get_or_create_thread('Test thread', $context, null, 'Visible thread name');
+        $thread = manager::get_or_create_thread('Test thread', $context, 'Visible thread name');
         $this->assertSame('Visible thread name', $this->get_thread_name($thread));
     }
 
@@ -200,19 +200,16 @@ final class manager_test extends \advanced_testcase {
         $visiblethread = manager::get_or_create_thread(
             'visible-thread',
             $visiblecontext,
-            '/mod/label/view.php?id=' . $visiblelabel->cmid,
             'Visible label'
         );
         $hiddenthread = manager::get_or_create_thread(
             'hidden-thread',
             $hiddencontext,
-            '/mod/label/view.php?id=' . $hiddenlabel->cmid,
             'Hidden label'
         );
         $sectionthread = manager::get_or_create_thread(
             'section-thread',
             $coursecontext,
-            '/course/view.php?id=' . $course->id,
             'Section summary'
         );
 

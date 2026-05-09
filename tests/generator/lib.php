@@ -52,7 +52,6 @@ class filter_embeddiscussion_generator extends component_generator_base {
         $thread = \filter_embeddiscussion\manager::get_or_create_thread(
             $idnumber,
             $context,
-            null,
             ($threadname !== '') ? $threadname : null
         );
 
