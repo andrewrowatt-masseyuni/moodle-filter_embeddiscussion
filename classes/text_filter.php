@@ -29,10 +29,8 @@ namespace filter_embeddiscussion;
  *
  * Legacy syntaxes can also be recognised and rewritten to the canonical token
  * before processing when enabled via site settings:
- *   - [[filter_disqus]]  -> {discussion:<page name>}
- *   - {comments}         -> {discussion:<page name>}
- * where <page name> is the current $PAGE->title with any trailing
- * " | <site fullname>" or " | <site shortname>" segment stripped off.
+ *   - [[filter_disqus]]  -> {discussion}
+ *   - {comments}         -> {discussion}
  *
  * @package    filter_embeddiscussion
  * @copyright  2026 Andrew Rowatt <A.J.Rowatt@massey.ac.nz>
@@ -94,10 +92,10 @@ class text_filter extends \core_filters\text_filter {
             }
 
             $tokentype = strtolower($matches[1] ?? 'discussion');
-            $body = self::sanitise_thread_name($matches[2] ?? '');
+            $threadname = self::sanitise_thread_name($matches[2] ?? '');
             $anonymous = ($tokentype === 'anondiscussion' || $tokentype === 'anonymousdiscussion');
 
-            $rendered = $self->render_thread_placeholder($body, $anonymous, $OUTPUT);
+            $rendered = $self->render_thread_placeholder($threadname, $anonymous, $OUTPUT);
             return $rendered ?? $matches[0];
         }, $text);
 
@@ -113,22 +111,17 @@ class text_filter extends \core_filters\text_filter {
         return $text;
     }
 
-    /**
-     * Rewrite enabled legacy [[filter_disqus]] / {comments} tokens in text to
-     * the canonical {discussion:...} token, deriving the thread name from
-     * $PAGE->title.
-     *
-     * If the page title is unavailable (for example, when the filter runs in a
-     * context without a fully-initialised page), the legacy tokens are left
-     * untouched so that the original text is preserved.
-     *
-     * @param string $text the text being filtered
-     * @param bool|null $disqusenabled whether [[filter_disqus]] tokens should be converted;
-     *                                 null to read site configuration
-     * @param bool|null $commentsenabled whether {comments} tokens should be converted;
-     *                                   null to read site configuration
-     * @return string the text with any legacy tokens rewritten
-     */
+     /**
+      * Rewrite enabled legacy [[filter_disqus]] / {comments} tokens in text to
+      * the canonical {discussion} token.
+      *
+      * @param string $text the text being filtered
+      * @param bool|null $disqusenabled whether [[filter_disqus]] tokens should be converted;
+      *                                 null to read site configuration
+      * @param bool|null $commentsenabled whether {comments} tokens should be converted;
+      *                                   null to read site configuration
+      * @return string the text with any legacy tokens rewritten
+      */
     public static function convert_legacy_tokens(
         string $text,
         ?bool $disqusenabled = null,
@@ -144,15 +137,10 @@ class text_filter extends \core_filters\text_filter {
             return $text;
         }
 
-        $threadname = self::sanitise_thread_name(self::derive_current_page_name());
-        if ($threadname === '') {
-            return $text;
-        }
-
         if ($disqusenabled) {
             $text = preg_replace(
                 '/\[\[filter_disqus\]\]/i',
-                '{discussion:' . $threadname . '}',
+                '{discussion}',
                 $text
             );
         }
@@ -160,7 +148,7 @@ class text_filter extends \core_filters\text_filter {
         if ($commentsenabled) {
             $text = preg_replace(
                 '/\{comments\}/i',
-                '{discussion:' . $threadname . '}',
+                '{discussion}',
                 $text
             );
         }
@@ -205,20 +193,19 @@ class text_filter extends \core_filters\text_filter {
         ]);
     }
 
-    /**
-     * Render a discussion placeholder.
-     *
-     * In Book chapter pages the thread name can be omitted and falls back to
-     * derive_current_page_name(). In all other locations, an omitted name is
-     * treated as unsupported and either renders a guidance notice (for editors)
-     * or nothing (for non-editors).
-     *
-     * @param string $name explicit thread name from the token body
-     * @param bool $anonymous whether anonymous mode should be applied
-     * @param object $output the page output renderer
-     * @return string|null rendered HTML, empty string to remove token, or null
-     *                     to keep the original token text
-     */
+     /**
+      * Render a discussion placeholder.
+      *
+      * In Book chapter pages, an omitted thread name falls back to $PAGE->title.
+      * In all other contexts, an omitted thread name falls back to
+      * "context-<contextid>".
+      *
+      * @param string $name explicit thread name from the token body
+      * @param bool $anonymous whether anonymous mode should be applied
+      * @param object $output the page output renderer
+      * @return string|null rendered HTML, empty string to remove token, or null
+      *                     to keep the original token text
+      */
     protected function render_thread_placeholder(
         string $name,
         bool $anonymous,
@@ -226,16 +213,9 @@ class text_filter extends \core_filters\text_filter {
     ): ?string {
         $threadname = self::sanitise_thread_name($name);
         if ($threadname === '') {
-            if ($this->can_embed_discussions_here()) {
-                $threadname = self::sanitise_thread_name(self::derive_current_page_name());
-                if ($threadname === '') {
-                    return null;
-                }
-            } else {
-                if ($this->can_display_unsupported_notice()) {
-                    return $output->render_from_template('filter_embeddiscussion/cannotbeembeddedhere', []);
-                }
-                return '';
+            $threadname = self::sanitise_thread_name($this->derive_default_thread_name());
+            if ($threadname === '') {
+                return null;
             }
         }
 
@@ -258,6 +238,27 @@ class text_filter extends \core_filters\text_filter {
     }
 
     /**
+     * Derive the fallback thread name when the token omits an explicit name.
+     *
+     * In Book contexts this uses $PAGE->title. In all other contexts this uses
+     * a stable context-scoped key "context-<contextid>".
+     *
+     * @return string
+     */
+    protected function derive_default_thread_name(): string {
+        global $PAGE;
+
+        [, , $cm] = get_context_info_array($this->context->id);
+
+
+        if (($cm->modname ?? '') === 'book' && $PAGE->url->get_path() === '/mod/book/view.php') {
+            return self::derive_current_page_name();
+        }
+
+        return 'context-' . (int)$this->context->id;
+    }
+
+    /**
      * Discover the course id associated with the filtered content. Falls back
      * to the current $PAGE course if the filter context is above CONTEXT_COURSE.
      *
@@ -274,75 +275,6 @@ class text_filter extends \core_filters\text_filter {
             return (int)$PAGE->course->id;
         }
         return 0;
-    }
-
-    /**
-     * Whether embedded discussions can be rendered in the current page context.
-     *
-     * @return bool true only for Book chapter view pages
-     */
-    protected function can_embed_discussions_here(): bool {
-        global $PAGE;
-
-        if (!isset($PAGE) || !is_object($PAGE)) {
-            return false;
-        }
-
-        // Moodle page uses magic properties; isset() can be unreliable here.
-        try {
-            $pagecontext = $PAGE->context;
-        } catch (\Throwable $e) {
-            return false;
-        }
-
-        if (!is_object($pagecontext) || empty($pagecontext->id)) {
-            return false;
-        }
-
-        [, , $cm] = get_context_info_array($pagecontext->id);
-
-        if (!isset($cm) || !is_object($cm)) {
-            return false;
-        }
-
-        if (($cm->modname ?? '') !== 'book') {
-            return false;
-        }
-
-        // Moodle page uses magic properties; isset() can be unreliable here.
-        try {
-            $url = $PAGE->url;
-        } catch (\Throwable $e) {
-            return false;
-        }
-
-        return $url->get_path() === '/mod/book/view.php';
-    }
-
-    /**
-     * Whether the current user should see unsupported-location guidance.
-     *
-     * @return bool true when user can edit the enclosing course
-     */
-    protected function can_display_unsupported_notice(): bool {
-        global $PAGE;
-
-        $coursectx = $this->context->get_course_context(false);
-        if (!$coursectx && isset($PAGE) && is_object($PAGE)) {
-            try {
-                $pagecontext = $PAGE->context;
-            } catch (\Throwable $e) {
-                $pagecontext = null;
-            }
-            if (is_object($pagecontext)) {
-                $coursectx = $pagecontext->get_course_context(false);
-            }
-        }
-        if (!$coursectx) {
-            return false;
-        }
-
-        return has_capability('moodle/course:manageactivities', $coursectx);
     }
 
     /**

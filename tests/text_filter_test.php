@@ -147,14 +147,14 @@ final class text_filter_test extends \advanced_testcase {
         $this->assertStringContainsString('data-threadid="' . (int)$threadb->id . '"', $output);
     }
 
-    public function test_filter_renders_latestposts_placeholder_in_course_context(): void {
+    public function test_filter_renders_discussiondashboard_placeholder_in_course_context(): void {
         global $PAGE;
         $this->resetAfterTest();
         $course = $this->getDataGenerator()->create_course();
         $PAGE->set_course($course);
         $context = \context_course::instance($course->id);
         $filter = $this->create_book_filter($context);
-        $output = $filter->filter('{discussion:latestposts}');
+        $output = $filter->filter('{discussiondashboard}');
         $this->assertStringContainsString('data-region="filter-embeddiscussion-dashboard"', $output);
         $this->assertStringContainsString('data-courseid="' . (int)$course->id . '"', $output);
     }
@@ -202,19 +202,21 @@ final class text_filter_test extends \advanced_testcase {
         $this->assertSame($input, $filter->filter($input));
     }
 
-    public function test_filter_removes_nameless_token_outside_book_for_non_editor(): void {
+    public function test_filter_defaults_nameless_token_to_context_key_outside_book_for_non_editor(): void {
         $this->resetAfterTest();
         $context = \context_system::instance();
         $filter = new text_filter($context, []);
         $output = $filter->filter('Before {discussion} after');
+        $threadname = 'context-' . (int)$context->id;
+        $thread = manager::find_thread($threadname, $context->id);
 
-        $this->assertStringNotContainsString('data-region="filter-embeddiscussion-unsupported"', $output);
-        $this->assertStringNotContainsString(get_string('cannotbeembeddedhere', 'filter_embeddiscussion'), $output);
-        $this->assertSame('Before  after', $output);
-        $this->assertNull(manager::find_thread('discussion', $context->id));
+        $this->assertNotNull($thread);
+        $this->assertSame($threadname, $this->get_thread_name($thread));
+        $this->assertStringContainsString('data-region="filter-embeddiscussion"', $output);
+        $this->assertStringContainsString('data-threadid="' . (int)$thread->id . '"', $output);
     }
 
-    public function test_filter_shows_unsupported_notice_to_course_editor_when_name_missing_outside_book(): void {
+    public function test_filter_defaults_nameless_token_to_context_key_outside_book_for_course_editor(): void {
         global $PAGE;
 
         $this->resetAfterTest();
@@ -228,10 +230,13 @@ final class text_filter_test extends \advanced_testcase {
         $PAGE->set_context($coursecontext);
         $filter = new text_filter($coursecontext, []);
         $output = $filter->filter('Before {discussion} after');
+        $threadname = 'context-' . (int)$coursecontext->id;
+        $thread = manager::find_thread($threadname, $coursecontext->id);
 
-        $this->assertStringContainsString('data-region="filter-embeddiscussion-unsupported"', $output);
-        $this->assertStringContainsString(get_string('cannotbeembeddedhere', 'filter_embeddiscussion'), $output);
-        $this->assertNull(manager::find_thread('Course: Course 1', $coursecontext->id));
+        $this->assertNotNull($thread);
+        $this->assertSame($threadname, $this->get_thread_name($thread));
+        $this->assertStringContainsString('data-region="filter-embeddiscussion"', $output);
+        $this->assertStringContainsString('data-threadid="' . (int)$thread->id . '"', $output);
     }
 
     public function test_filter_renders_named_discussion_token_outside_book_context(): void {
@@ -309,89 +314,59 @@ final class text_filter_test extends \advanced_testcase {
     }
 
     public function test_convert_legacy_tokens_basic_disqus(): void {
-        global $PAGE, $SITE;
         $this->resetAfterTest();
         $this->configure_legacy_token_handling(true, false);
-        $PAGE->set_title('Course: Course 1', false);
-        $SITE->fullname = 'Acceptance test site';
-        $SITE->shortname = 'Acceptance test site';
         $output = text_filter::convert_legacy_tokens('Before [[filter_disqus]] after');
-        $this->assertSame('Before {discussion:Course: Course 1} after', $output);
+        $this->assertSame('Before {discussion} after', $output);
     }
 
     public function test_convert_legacy_tokens_does_not_convert_disqus_with_segment(): void {
-        global $PAGE, $SITE;
         $this->resetAfterTest();
         $this->configure_legacy_token_handling(true, false);
-        $PAGE->set_title('Course: Course 1', false);
-        $SITE->fullname = 'Acceptance test site';
-        $SITE->shortname = 'Acceptance test site';
         $input = '[[filter_disqus:book-23]]';
         $this->assertSame($input, text_filter::convert_legacy_tokens($input));
     }
 
     public function test_convert_legacy_tokens_comments(): void {
-        global $PAGE, $SITE;
         $this->resetAfterTest();
         $this->configure_legacy_token_handling(false, true);
-        $PAGE->set_title('Course: Course 1', false);
-        $SITE->fullname = 'Acceptance test site';
-        $SITE->shortname = 'Acceptance test site';
         $output = text_filter::convert_legacy_tokens('Comments here: {comments}');
-        $this->assertSame('Comments here: {discussion:Course: Course 1}', $output);
+        $this->assertSame('Comments here: {discussion}', $output);
     }
 
-    public function test_convert_legacy_tokens_strips_site_suffix(): void {
-        global $PAGE, $SITE;
+    public function test_convert_legacy_tokens_rewrites_without_page_title_dependency(): void {
         $this->resetAfterTest();
         $this->configure_legacy_token_handling(true, false);
-        $PAGE->set_title('Celebrating Cultures | Interesting cities | Mount Orange', false);
-        $SITE->fullname = 'Mount Orange';
-        $SITE->shortname = 'mountorange';
         $output = text_filter::convert_legacy_tokens('[[filter_disqus]]');
-        $this->assertSame('{discussion:Celebrating Cultures | Interesting cities}', $output);
+        $this->assertSame('{discussion}', $output);
     }
 
-    public function test_convert_legacy_tokens_leaves_text_when_title_empty(): void {
-        global $PAGE;
+    public function test_convert_legacy_tokens_converts_when_title_empty(): void {
         $this->resetAfterTest();
         $this->configure_legacy_token_handling(true, true);
-        $PAGE->set_title('', false);
         $input = 'Untouched [[filter_disqus]] {comments}';
-        $this->assertSame($input, text_filter::convert_legacy_tokens($input));
+        $this->assertSame('Untouched {discussion} {discussion}', text_filter::convert_legacy_tokens($input));
     }
 
     public function test_convert_legacy_tokens_leaves_text_when_both_options_disabled(): void {
-        global $PAGE, $SITE;
         $this->resetAfterTest();
         $this->configure_legacy_token_handling(false, false);
-        $PAGE->set_title('Course: Course 1', false);
-        $SITE->fullname = 'Acceptance test site';
-        $SITE->shortname = 'Acceptance test site';
         $input = 'Untouched [[filter_disqus]] {comments}';
         $this->assertSame($input, text_filter::convert_legacy_tokens($input));
     }
 
     public function test_convert_legacy_tokens_handles_disqus_only_when_enabled(): void {
-        global $PAGE, $SITE;
         $this->resetAfterTest();
         $this->configure_legacy_token_handling(true, false);
-        $PAGE->set_title('Course: Course 1', false);
-        $SITE->fullname = 'Acceptance test site';
-        $SITE->shortname = 'Acceptance test site';
         $input = 'A [[filter_disqus]] B {comments}';
-        $this->assertSame('A {discussion:Course: Course 1} B {comments}', text_filter::convert_legacy_tokens($input));
+        $this->assertSame('A {discussion} B {comments}', text_filter::convert_legacy_tokens($input));
     }
 
     public function test_convert_legacy_tokens_handles_comments_only_when_enabled(): void {
-        global $PAGE, $SITE;
         $this->resetAfterTest();
         $this->configure_legacy_token_handling(false, true);
-        $PAGE->set_title('Course: Course 1', false);
-        $SITE->fullname = 'Acceptance test site';
-        $SITE->shortname = 'Acceptance test site';
         $input = 'A [[filter_disqus]] B {comments}';
-        $this->assertSame('A [[filter_disqus]] B {discussion:Course: Course 1}', text_filter::convert_legacy_tokens($input));
+        $this->assertSame('A [[filter_disqus]] B {discussion}', text_filter::convert_legacy_tokens($input));
     }
 
     public function test_filter_renders_legacy_disqus_token(): void {
