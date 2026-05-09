@@ -27,9 +27,6 @@ namespace filter_embeddiscussion;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class manager {
-    /** Allowed inline tags after sanitisation. */
-    const ALLOWED_TAGS = '<p><br><b><strong><i><em><u><a><img><mark><ul><ol><li><blockquote><span>';
-
     /** @var bool|null cache of whether the threadname column exists. */
     protected static $threadnamecol = null;
 
@@ -173,26 +170,16 @@ class manager {
     }
 
     /**
-     * Sanitise post HTML to the allowed inline tag set.
+     * Sanitise post HTML through Moodle's KSES-based cleaner.
+     *
+     * Uses clean_text() with FORMAT_HTML, which strips event handlers, blocks
+     * dangerous URL schemes, and enforces the site-configured allowed tag set.
      *
      * @param string $html
      * @return string
      */
     public static function sanitise(string $html): string {
-        $clean = strip_tags($html, self::ALLOWED_TAGS);
-        // Strip any javascript: / data: URLs in href/src.
-        $clean = preg_replace_callback(
-            '/(href|src)\s*=\s*"([^"]*)"/i',
-            function ($m) {
-                $url = trim($m[2]);
-                if (preg_match('/^\s*javascript:/i', $url)) {
-                    return $m[1] . '="#"';
-                }
-                return $m[0];
-            },
-            $clean
-        );
-        return $clean;
+        return clean_text($html, FORMAT_HTML);
     }
 
     /**
@@ -610,7 +597,11 @@ class manager {
         return [
             'id' => (int)$post->id,
             'parentid' => (int)$post->parentid,
-            'content' => $post->deleted ? '' : $post->content,
+            'content' => $post->deleted ? '' : format_text(
+                $post->content,
+                FORMAT_HTML,
+                ['context' => $context, 'filter' => false, 'noclean' => false]
+            ),
             'deleted' => (bool)$post->deleted,
             'edited' => (bool)$post->edited,
             'timecreated' => (int)$post->timecreated,

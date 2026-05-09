@@ -1,0 +1,11 @@
+<?xml version="1.0"?>
+<libraries>
+  <library>
+    <location>thirdparty/quill</location>
+    <name>Quill</name>
+    <version>2.0.3</version>
+    <license>BSD</license>
+    <licenseversion>3-Clause</licenseversion>
+    <repository>https://github.com/slab/quill</repository>
+  </library>
+</libraries>

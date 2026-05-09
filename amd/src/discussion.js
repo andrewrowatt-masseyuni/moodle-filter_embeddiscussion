@@ -99,7 +99,6 @@ class Discussion {
     constructor(root) {
         this.root = root;
         this.threadid = parseInt(root.dataset.threadid, 10);
-        this.contextid = parseInt(root.dataset.contextid, 10);
         this.thread = null; // Server payload.
         this.sortMode = 'oldest';
         this.composerEditor = null;
@@ -260,7 +259,6 @@ class Discussion {
                 methodname: 'filter_embeddiscussion_create_post',
                 args: {
                     threadid: this.thread.threadid,
-                    contextid: this.contextid,
                     parentid: 0,
                     content: html,
                 },
@@ -335,7 +333,6 @@ class Discussion {
                 methodname: 'filter_embeddiscussion_create_post',
                 args: {
                     threadid: this.thread.threadid,
-                    contextid: this.contextid,
                     parentid: this.activeReply.parentId,
                     content: html,
                 },
@@ -407,7 +404,6 @@ class Discussion {
                 methodname: 'filter_embeddiscussion_edit_post',
                 args: {
                     postid: this.activeEdit.postId,
-                    contextid: this.contextid,
                     content: html,
                 },
             }])[0];
@@ -436,7 +432,7 @@ class Discussion {
         try {
             const data = await Ajax.call([{
                 methodname: 'filter_embeddiscussion_delete_post',
-                args: {postid: postId, contextid: this.contextid},
+                args: {postid: postId},
             }])[0];
             this.thread = data;
             await this.renderPosts();
@@ -458,7 +454,7 @@ class Discussion {
         try {
             const result = await Ajax.call([{
                 methodname: 'filter_embeddiscussion_vote_post',
-                args: {postid: postId, contextid: this.contextid, direction: finalDir},
+                args: {postid: postId, direction: finalDir},
             }])[0];
             // Update local model and the post DOM in place.
             if (post) {

@@ -38,7 +38,6 @@ class vote_post extends external_api {
     public static function execute_parameters(): external_function_parameters {
         return new external_function_parameters([
             'postid' => new external_value(PARAM_INT, 'Post id'),
-            'contextid' => new external_value(PARAM_INT, 'Context id'),
             'direction' => new external_value(PARAM_INT, 'Vote direction: -1, 0, or 1'),
         ]);
     }
@@ -47,21 +46,16 @@ class vote_post extends external_api {
      * Vote.
      *
      * @param int $postid
-     * @param int $contextid
      * @param int $direction
      * @return array
      */
-    public static function execute(int $postid, int $contextid, int $direction): array {
+    public static function execute(int $postid, int $direction): array {
         global $USER, $DB;
 
         $params = self::validate_parameters(self::execute_parameters(), [
             'postid' => $postid,
-            'contextid' => $contextid,
             'direction' => $direction,
         ]);
-
-        $context = \context::instance_by_id($params['contextid']);
-        self::validate_context($context);
 
         $post = $DB->get_record('filter_embeddiscussion_post', ['id' => $params['postid']], '*', MUST_EXIST);
         $thread = $DB->get_record(
@@ -70,6 +64,10 @@ class vote_post extends external_api {
             '*',
             MUST_EXIST
         );
+
+        // Derive the context from the thread; never trust a client-supplied context.
+        $context = \context::instance_by_id((int)$thread->contextid);
+        self::validate_context($context);
 
         $summary = manager::vote_post(
             $params['postid'],

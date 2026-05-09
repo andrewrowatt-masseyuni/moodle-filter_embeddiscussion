@@ -37,7 +37,6 @@ class edit_post extends external_api {
     public static function execute_parameters(): external_function_parameters {
         return new external_function_parameters([
             'postid' => new external_value(PARAM_INT, 'Post id'),
-            'contextid' => new external_value(PARAM_INT, 'Context id'),
             'content' => new external_value(PARAM_RAW, 'New HTML content'),
         ]);
     }
@@ -46,21 +45,16 @@ class edit_post extends external_api {
      * Edit.
      *
      * @param int $postid
-     * @param int $contextid
      * @param string $content
      * @return array
      */
-    public static function execute(int $postid, int $contextid, string $content): array {
+    public static function execute(int $postid, string $content): array {
         global $USER, $DB;
 
         $params = self::validate_parameters(self::execute_parameters(), [
             'postid' => $postid,
-            'contextid' => $contextid,
             'content' => $content,
         ]);
-
-        $context = \context::instance_by_id($params['contextid']);
-        self::validate_context($context);
 
         $post = $DB->get_record('filter_embeddiscussion_post', ['id' => $params['postid']], '*', MUST_EXIST);
         $thread = $DB->get_record(
@@ -69,6 +63,10 @@ class edit_post extends external_api {
             '*',
             MUST_EXIST
         );
+
+        // Derive the context from the thread; never trust a client-supplied context.
+        $context = \context::instance_by_id((int)$thread->contextid);
+        self::validate_context($context);
 
         manager::edit_post($params['postid'], $thread, $context, $params['content'], $USER->id);
 

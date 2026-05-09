@@ -16,15 +16,19 @@
 /**
  * Quill loader and factory for filter_embeddiscussion.
  *
- * Loads Quill 2.x snow theme via CDN on demand and exposes a small wrapper.
+ * Loads the locally vendored Quill 2.x snow theme on demand and exposes
+ * a small wrapper. The library is shipped under
+ * filter/embeddiscussion/thirdparty/quill/ and declared in thirdpartylibs.xml.
  *
  * @module     filter_embeddiscussion/editor
  * @copyright  2026 Andrew Rowatt <A.J.Rowatt@massey.ac.nz>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-const QUILL_JS = 'https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.js';
-const QUILL_CSS = 'https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.snow.css';
+import Config from 'core/config';
+
+const QUILL_JS = `${Config.wwwroot}/filter/embeddiscussion/thirdparty/quill/quill.js`;
+const QUILL_CSS = `${Config.wwwroot}/filter/embeddiscussion/thirdparty/quill/quill.snow.css`;
 
 let quillPromise = null;
 

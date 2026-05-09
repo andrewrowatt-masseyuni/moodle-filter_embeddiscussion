@@ -37,7 +37,6 @@ class create_post extends external_api {
     public static function execute_parameters(): external_function_parameters {
         return new external_function_parameters([
             'threadid' => new external_value(PARAM_INT, 'Thread id'),
-            'contextid' => new external_value(PARAM_INT, 'Context id'),
             'parentid' => new external_value(PARAM_INT, 'Parent post id, 0 for top-level', VALUE_DEFAULT, 0),
             'content' => new external_value(PARAM_RAW, 'Post HTML content'),
         ]);
@@ -47,23 +46,18 @@ class create_post extends external_api {
      * Create.
      *
      * @param int $threadid
-     * @param int $contextid
      * @param int $parentid
      * @param string $content
      * @return array
      */
-    public static function execute(int $threadid, int $contextid, int $parentid, string $content): array {
+    public static function execute(int $threadid, int $parentid, string $content): array {
         global $USER, $DB;
 
         $params = self::validate_parameters(self::execute_parameters(), [
             'threadid' => $threadid,
-            'contextid' => $contextid,
             'parentid' => $parentid,
             'content' => $content,
         ]);
-
-        $context = \context::instance_by_id($params['contextid']);
-        self::validate_context($context);
 
         $thread = $DB->get_record(
             'filter_embeddiscussion_thread',
@@ -71,6 +65,12 @@ class create_post extends external_api {
             '*',
             MUST_EXIST
         );
+
+        // Derive the context from the thread, not from the client. The client
+        // must not be able to choose a context where it happens to hold the
+        // capability and post into a thread anchored elsewhere.
+        $context = \context::instance_by_id((int)$thread->contextid);
+        self::validate_context($context);
 
         manager::create_post($thread, $context, $params['parentid'], $params['content'], $USER->id);
 
