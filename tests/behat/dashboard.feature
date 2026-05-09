@@ -67,7 +67,7 @@ Feature: Embedded discussion dashboard
     And I should not see "This message is in a hidden mod"
 
   @javascript
-  Scenario: Dashboard links section summary posts back to the course homepage
+  Scenario: Dashboard links section summary posts to an in-page post anchor
     Given I log in as "teacher1"
     And I am on "Course 1" course homepage with editing mode on
     And I edit the section "1" and I fill the form with:
@@ -86,13 +86,12 @@ Feature: Embedded discussion dashboard
     And the embedded discussion dashboard is loaded
     Then I should see "Section discussion dashboard message"
     When I follow "Section discussion dashboard message"
-    And the embedded discussion is loaded
-    Then the url should match "/course/view\.php\?id=[0-9]+"
-    And I should see "Summary intro"
+    And the embedded discussion dashboard is loaded
+    Then the url should match "/mod/book/view\.php\?id=[0-9]+#embeddisc-post-[0-9]+"
     And I should see "Section discussion dashboard message"
 
   @javascript
-  Scenario: Dashboard links label posts back to the course homepage
+  Scenario: Dashboard links label posts to an in-page post anchor
     Given the following "activities" exist:
       | activity | course | name                | idnumber  | intro                                  |
       | label    | C1     | Section news label  | labeldash | Label intro {discussion:Label updates} |
@@ -111,13 +110,12 @@ Feature: Embedded discussion dashboard
     And the embedded discussion dashboard is loaded
     Then I should see "Label discussion dashboard message"
     When I follow "Label discussion dashboard message"
-    And the embedded discussion is loaded
-    Then the url should match "/course/view\.php\?id=[0-9]+"
-    And I should see "Label intro"
+    And the embedded discussion dashboard is loaded
+    Then the url should match "/mod/book/view\.php\?id=[0-9]+#embeddisc-post-[0-9]+"
     And I should see "Label discussion dashboard message"
 
   @javascript
-  Scenario: Dashboard links page posts back to the page activity
+  Scenario: Dashboard links page posts to an in-page post anchor
     Given the following "activities" exist:
       | activity | course | name               | idnumber | intro     | content                              |
       | page     | C1     | Section news page  | pagedash | Page desc | Page body {discussion:Page updates}  |
@@ -136,7 +134,6 @@ Feature: Embedded discussion dashboard
     And the embedded discussion dashboard is loaded
     Then I should see "Page discussion dashboard message"
     When I follow "Page discussion dashboard message"
-    And the embedded discussion is loaded
-    Then the url should match "/mod/page/view\.php\?id=[0-9]+"
-    And I should see "Page body"
+    And the embedded discussion dashboard is loaded
+    Then the url should match "/mod/book/view\.php\?id=[0-9]+#embeddisc-post-[0-9]+"
     And I should see "Page discussion dashboard message"

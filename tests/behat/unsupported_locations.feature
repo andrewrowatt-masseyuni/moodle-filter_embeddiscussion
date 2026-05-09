@@ -1,8 +1,8 @@
 @filter @filter_embeddiscussion @unsupported_locations
-Feature: Nameless tokens outside Book do not embed discussions
-  In order to enforce explicit naming outside Book chapters
+Feature: Nameless tokens outside Book embed discussions
+  In order to discuss course content from common Moodle locations
   As a course participant
-  I should only see guidance for nameless tokens if I can edit the course
+  I should see embedded discussions for nameless tokens outside Book chapters
 
   Background:
     Given the following "courses" exist:
@@ -18,54 +18,65 @@ Feature: Nameless tokens outside Book do not embed discussions
       | student1 | C1     | student        |
     And the "embeddiscussion" filter is "on"
 
-  Scenario: Teacher sees an unsupported-location notice for tokens in a label
+  @javascript
+  Scenario: Teacher sees a discussion for nameless tokens in a label
     Given the following "activities" exist:
       | activity | course | name               | intro                                                          | idnumber |
       | label    | C1     | Unsupported label  | Before {discussion} after                                      | label1   |
     When I log in as "teacher1"
     And I am on "Course 1" course homepage
-    Then I should see "Discussions cannot be embedded here. Only Book chapters are currently supported"
+    Then the embedded discussion is loaded
     And I should not see "{discussion}"
-    And "[data-region='filter-embeddiscussion']" "css_element" should not exist
+    And "[data-region='filter-embeddiscussion']" "css_element" should exist
+    And I should not see "Discussions cannot be embedded here. Only Book chapters are currently supported"
 
-  Scenario: Student sees nothing for tokens in a label
+  @javascript
+  Scenario: Student sees a discussion for nameless tokens in a label
     Given the following "activities" exist:
       | activity | course | name               | intro                                                          | idnumber |
       | label    | C1     | Unsupported label  | Before {discussion} after                                      | label1   |
     When I log in as "student1"
     And I am on "Course 1" course homepage
-    Then I should not see "Discussions cannot be embedded here. Only Book chapters are currently supported"
+    Then the embedded discussion is loaded
     And I should not see "{discussion}"
-    And "[data-region='filter-embeddiscussion']" "css_element" should not exist
+    And "[data-region='filter-embeddiscussion']" "css_element" should exist
+    And I should not see "Discussions cannot be embedded here. Only Book chapters are currently supported"
 
-  Scenario: Teacher sees an unsupported-location notice for tokens in a page body
+  @javascript
+  Scenario: Teacher sees a discussion for nameless tokens in a page body
     Given the following "activities" exist:
       | activity | course | name              | intro      | content                                                      | idnumber |
       | page     | C1     | Unsupported page  | Page desc  | Before {discussion} after                                    | page1    |
     When I am on the "Unsupported page" "page activity" page logged in as "teacher1"
-    Then I should see "Discussions cannot be embedded here. Only Book chapters are currently supported"
+    Then the embedded discussion is loaded
     And I should not see "{discussion}"
-    And "[data-region='filter-embeddiscussion']" "css_element" should not exist
+    And "[data-region='filter-embeddiscussion']" "css_element" should exist
+    And I should not see "Discussions cannot be embedded here. Only Book chapters are currently supported"
 
-  Scenario: Student sees nothing for tokens in a page body
+  @javascript
+  Scenario: Student sees a discussion for nameless tokens in a page body
     Given the following "activities" exist:
       | activity | course | name              | intro      | content                                                      | idnumber |
       | page     | C1     | Unsupported page  | Page desc  | Before {discussion} after                                    | page1    |
     When I am on the "Unsupported page" "page activity" page logged in as "student1"
-    Then I should not see "Discussions cannot be embedded here. Only Book chapters are currently supported"
+    Then the embedded discussion is loaded
     And I should not see "{discussion}"
-    And "[data-region='filter-embeddiscussion']" "css_element" should not exist
+    And "[data-region='filter-embeddiscussion']" "css_element" should exist
+    And I should not see "Discussions cannot be embedded here. Only Book chapters are currently supported"
 
-  Scenario: Teacher sees an unsupported-location notice for tokens in a section summary
+  @javascript
+  Scenario: Teacher sees a discussion for nameless tokens in a section summary
     Given I log in as "teacher1"
     And I am on "Course 1" course homepage with editing mode on
     When I edit the section "1" and I fill the form with:
       | Description | Before {discussion} after                     |
-    Then I should see "Discussions cannot be embedded here. Only Book chapters are currently supported"
+    Then the embedded discussion is loaded
     And I should not see "{discussion}"
-    And "[data-region='filter-embeddiscussion']" "css_element" should not exist
+    And "[data-region='filter-embeddiscussion']" "css_element" should exist
+    And I should not see "Discussions cannot be embedded here. Only Book chapters are currently supported"
 
-  Scenario: Student sees nothing for tokens in a section summary
+  @javascript
+  Scenario: Student sees a discussion for nameless tokens in a section summary
     Given I log in as "teacher1"
     And I am on "Course 1" course homepage with editing mode on
     And I edit the section "1" and I fill the form with:
@@ -73,6 +84,7 @@ Feature: Nameless tokens outside Book do not embed discussions
     When I log out
     And I log in as "student1"
     And I am on "Course 1" course homepage
-    Then I should not see "Discussions cannot be embedded here. Only Book chapters are currently supported"
+    Then the embedded discussion is loaded
     And I should not see "{discussion}"
-    And "[data-region='filter-embeddiscussion']" "css_element" should not exist
+    And "[data-region='filter-embeddiscussion']" "css_element" should exist
+    And I should not see "Discussions cannot be embedded here. Only Book chapters are currently supported"
