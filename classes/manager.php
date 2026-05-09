@@ -458,6 +458,9 @@ class manager {
 
         \filter_embeddiscussion\event\post_voted::create_for_post($post, $thread, $context, $direction)->trigger();
 
+        // Drop any prefetched counts for this post so the summary reflects the write we just made.
+        unset(self::$votecountscache[$postid], self::$myvotescache[$postid]);
+
         return self::vote_summary($postid, $userid);
     }
 
