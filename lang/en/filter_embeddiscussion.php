@@ -30,6 +30,7 @@ $string['anonymous'] = 'Anonymous';
 $string['anonymousnotice'] = 'Your posts will be anonymous to other students.';
 $string['anonymousnoticemanager'] = 'Student posts will appear as anonymous to other students.';
 $string['befirsttocomment'] = 'Be the first to comment.';
+$string['cachedef_identicons'] = 'Cache definition for identicons';
 $string['cancel'] = 'Cancel';
 $string['cannotbeembeddedhere'] = 'Discussions cannot be embedded here. Only Book chapters are currently supported';
 $string['comment'] = 'Comment';

@@ -15,7 +15,7 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Version information for Embeddiscussion
+ * Cache definitions for filter_embeddiscussion.
  *
  * @package    filter_embeddiscussion
  * @copyright  2026 Andrew Rowatt <A.J.Rowatt@massey.ac.nz>
@@ -24,9 +24,14 @@
 
 defined('MOODLE_INTERNAL') || die();
 
-$plugin->component    = 'filter_embeddiscussion';
-$plugin->release      = '1.0';
-$plugin->version      = 2026051000;
-$plugin->requires     = 2024100700;
-$plugin->supported    = [405, 501];
-$plugin->maturity     = MATURITY_STABLE;
+$definitions = [
+    // Memoised identicon PNG data URIs, keyed by sha1(seed:size). Identicons are a pure
+    // function of their seed, so an indefinite cache lifetime is correct; entries are
+    // only invalidated by a manual cache purge.
+    'identicons' => [
+        'mode' => cache_store::MODE_APPLICATION,
+        'simplekeys' => true,
+        'staticacceleration' => true,
+        'staticaccelerationsize' => 100,
+    ],
+];

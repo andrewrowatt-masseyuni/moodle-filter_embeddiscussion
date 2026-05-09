@@ -31,6 +31,10 @@ class identicon {
     /**
      * Generate a base64 PNG data URI for the given seed.
      *
+     * Memoised in the 'identicons' application cache: identicons are a pure function
+     * of (seed, size) so the GD work runs once and subsequent requests reuse the
+     * encoded data URI until the cache is purged.
+     *
      * @param string $seed
      * @param int $size pixel size of the square avatar
      * @return string data: URI suitable for an img src, or '' if GD is unavailable
@@ -40,6 +44,26 @@ class identicon {
             return '';
         }
 
+        $cache = \cache::make('filter_embeddiscussion', 'identicons');
+        $key = sha1($seed . ':' . $size);
+        $cached = $cache->get($key);
+        if ($cached !== false) {
+            return $cached;
+        }
+
+        $uri = self::generate($seed, $size);
+        $cache->set($key, $uri);
+        return $uri;
+    }
+
+    /**
+     * Render the identicon for a seed and encode it as a base64 PNG data URI.
+     *
+     * @param string $seed
+     * @param int $size
+     * @return string
+     */
+    private static function generate(string $seed, int $size): string {
         // Derive colour and grid from a SHA-256 hash of the seed.
         $hash = hash('sha256', $seed);
 
