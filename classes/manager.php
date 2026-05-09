@@ -799,7 +799,9 @@ class manager {
                 continue;
             }
             $threadsout[] = $entry;
-            $postsout = array_merge($postsout, $entry['posts']);
+            foreach ($entry['posts'] as $p) {
+                $postsout[] = $p;
+            }
         }
 
         usort($postsout, function (array $a, array $b): int {
