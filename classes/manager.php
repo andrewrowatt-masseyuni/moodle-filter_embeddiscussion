@@ -27,33 +27,24 @@ namespace filter_embeddiscussion;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class manager {
-    /** @var array<int,\stdClass> userid => user record (request-scoped). */
-    protected static $userscache = [];
-
-    /** @var array<string,array<int,\stdClass>> "ctx:N" => [userid => roles]. */
-    protected static $rolescache = [];
-
-    /** @var array<int,array{up:int,down:int}> postid => counts. */
-    protected static $votecountscache = [];
-
-    /** @var array<int,int> postid => the viewing user's vote (-1/0/1). */
-    protected static $myvotescache = [];
-
     /**
-     * Prefetch the user records, role assignments, and vote totals needed to
-     * render a list of posts. Populates the request-scoped caches consumed by
-     * build_post_view, user_is_student, user_role_label and vote_summary so
-     * each rendering pass costs O(1) DB queries instead of O(posts).
+     * Build the render context — batched user records, role assignments and
+     * vote counts — needed to render a list of posts. Returned as a plain array
+     * with the lifetime of the calling render: no class statics, no leakage
+     * across requests or tests, no possibility of a write path reading stale
+     * values from a render-populated cache.
      *
      * @param \stdClass[] $posts
      * @param \context $context
      * @param int $vieweruserid the user we are rendering for
+     * @return array{users:array<int,\stdClass>,roles:array<int,array>,votecounts:array<int,array{up:int,down:int}>,myvotes:array<int,int>}
      */
-    protected static function prefetch_post_data(array $posts, \context $context, int $vieweruserid): void {
+    protected static function build_render_context(array $posts, \context $context, int $vieweruserid): array {
         global $DB;
 
+        $ctx = ['users' => [], 'roles' => [], 'votecounts' => [], 'myvotes' => []];
         if (empty($posts)) {
-            return;
+            return $ctx;
         }
 
         $userids = [];
@@ -65,27 +56,22 @@ class manager {
         $userids = array_keys($userids);
         $postids = array_keys($postids);
 
-        // Users — single IN query, populated into the user cache.
-        $missinguserids = array_values(array_diff($userids, array_keys(self::$userscache)));
-        if ($missinguserids) {
-            $users = $DB->get_records_list('user', 'id', $missinguserids);
-            foreach ($users as $u) {
-                self::$userscache[(int)$u->id] = $u;
-            }
+        // Users — single IN query.
+        $users = $DB->get_records_list('user', 'id', $userids);
+        foreach ($users as $u) {
+            $ctx['users'][(int)$u->id] = $u;
         }
 
         // Roles per user in this context.
-        $ctxkey = 'ctx:' . $context->id;
-        if (!isset(self::$rolescache[$ctxkey])) {
-            self::$rolescache[$ctxkey] = [];
-        }
         foreach ($userids as $uid) {
-            if (!array_key_exists($uid, self::$rolescache[$ctxkey])) {
-                self::$rolescache[$ctxkey][$uid] = get_user_roles($context, $uid, true);
-            }
+            $ctx['roles'][$uid] = get_user_roles($context, $uid, true);
         }
 
         // Vote totals — one GROUP BY query for up/down per post.
+        foreach ($postids as $pid) {
+            $ctx['votecounts'][$pid] = ['up' => 0, 'down' => 0];
+            $ctx['myvotes'][$pid] = 0;
+        }
         [$insql, $params] = $DB->get_in_or_equal($postids, SQL_PARAMS_NAMED, 'p');
         $rows = $DB->get_records_sql(
             "SELECT postid, vote, COUNT(1) AS c
@@ -94,15 +80,12 @@ class manager {
            GROUP BY postid, vote",
             $params
         );
-        foreach ($postids as $pid) {
-            self::$votecountscache[$pid] = ['up' => 0, 'down' => 0];
-        }
         foreach ($rows as $row) {
             $pid = (int)$row->postid;
             if ((int)$row->vote === 1) {
-                self::$votecountscache[$pid]['up'] = (int)$row->c;
+                $ctx['votecounts'][$pid]['up'] = (int)$row->c;
             } else if ((int)$row->vote === -1) {
-                self::$votecountscache[$pid]['down'] = (int)$row->c;
+                $ctx['votecounts'][$pid]['down'] = (int)$row->c;
             }
         }
 
@@ -114,12 +97,11 @@ class manager {
               WHERE postid $insql AND userid = :userid",
             $params
         );
-        foreach ($postids as $pid) {
-            self::$myvotescache[$pid] = 0;
-        }
         foreach ($myrows as $row) {
-            self::$myvotescache[(int)$row->postid] = (int)$row->vote;
+            $ctx['myvotes'][(int)$row->postid] = (int)$row->vote;
         }
+
+        return $ctx;
     }
 
     /**
@@ -458,29 +440,22 @@ class manager {
 
         \filter_embeddiscussion\event\post_voted::create_for_post($post, $thread, $context, $direction)->trigger();
 
-        // Drop any prefetched counts for this post so the summary reflects the write we just made.
-        unset(self::$votecountscache[$postid], self::$myvotescache[$postid]);
-
         return self::vote_summary($postid, $userid);
     }
 
     /**
-     * Aggregate vote counts plus the current user's vote.
+     * Aggregate vote counts plus the named user's vote, read directly from the
+     * database. Render paths read prefetched counts via build_render_context;
+     * this helper is for the write path (vote_post) and for any caller that
+     * needs a fresh authoritative summary.
      *
      * @param int $postid
      * @param int $userid
      * @return array [int up, int down, int my]
      */
     public static function vote_summary(int $postid, int $userid): array {
-        global $DB, $USER;
+        global $DB;
 
-        if (isset(self::$votecountscache[$postid]) && (int)$USER->id === $userid) {
-            return [
-                'up' => self::$votecountscache[$postid]['up'],
-                'down' => self::$votecountscache[$postid]['down'],
-                'my' => self::$myvotescache[$postid] ?? 0,
-            ];
-        }
         $up = (int)$DB->count_records('filter_embeddiscussion_vote', ['postid' => $postid, 'vote' => 1]);
         $down = (int)$DB->count_records('filter_embeddiscussion_vote', ['postid' => $postid, 'vote' => -1]);
         $myrec = $DB->get_record('filter_embeddiscussion_vote', ['postid' => $postid, 'userid' => $userid]);
@@ -491,13 +466,17 @@ class manager {
     /**
      * Determine whether a user has the student archetype in this context.
      *
+     * Render paths pass the prefetched roles array from build_render_context;
+     * write paths (e.g. create_post) omit it and pay one DB lookup.
+     *
      * @param \context $context
      * @param int $userid
+     * @param array|null $roles pre-fetched role assignments, or null to look up
      * @return bool
      */
-    public static function user_is_student(\context $context, int $userid): bool {
+    public static function user_is_student(\context $context, int $userid, ?array $roles = null): bool {
         // Use only directly assigned roles; archetype 'student' or no role at all means treat as student.
-        $roles = self::user_roles_cached($context, $userid);
+        $roles ??= get_user_roles($context, $userid, true);
         if (empty($roles)) {
             return true;
         }
@@ -519,10 +498,11 @@ class manager {
      *
      * @param \context $context
      * @param int $userid
+     * @param array|null $roles pre-fetched role assignments, or null to look up
      * @return string empty if student/no special role
      */
-    public static function user_role_label(\context $context, int $userid): string {
-        $roles = self::user_roles_cached($context, $userid);
+    public static function user_role_label(\context $context, int $userid, ?array $roles = null): string {
+        $roles ??= get_user_roles($context, $userid, true);
         foreach ($roles as $r) {
             $archetype = self::role_archetype((int)$r->roleid);
             if ($archetype !== 'student' && $archetype !== '' && $archetype !== 'guest') {
@@ -530,24 +510,6 @@ class manager {
             }
         }
         return '';
-    }
-
-    /**
-     * Read role assignments via the request-scoped cache populated by
-     * prefetch_post_data, falling back to a direct lookup on cache miss.
-     *
-     * @param \context $context
-     * @param int $userid
-     * @return array
-     */
-    protected static function user_roles_cached(\context $context, int $userid): array {
-        $ctxkey = 'ctx:' . $context->id;
-        if (isset(self::$rolescache[$ctxkey]) && array_key_exists($userid, self::$rolescache[$ctxkey])) {
-            return self::$rolescache[$ctxkey][$userid];
-        }
-        $roles = get_user_roles($context, $userid, true);
-        self::$rolescache[$ctxkey][$userid] = $roles;
-        return $roles;
     }
 
     /**
@@ -582,7 +544,7 @@ class manager {
             'timecreated ASC'
         );
 
-        self::prefetch_post_data($posts, $context, (int)$USER->id);
+        $renderctx = self::build_render_context($posts, $context, (int)$USER->id);
 
         $canviewfullnames = has_capability('moodle/site:viewfullnames', $context);
         $canmanageposts = has_capability('filter/embeddiscussion:manageposts', $context);
@@ -599,6 +561,7 @@ class manager {
                 $p,
                 $thread,
                 $context,
+                $renderctx,
                 $canviewfullnames,
                 $canmanageposts,
                 $candeleteany,
@@ -634,6 +597,7 @@ class manager {
      * @param \stdClass $post
      * @param \stdClass $thread
      * @param \context $context
+     * @param array $renderctx render context produced by build_render_context
      * @param bool $canviewfullnames
      * @param bool $canmanageposts
      * @param bool $candeleteany
@@ -646,6 +610,7 @@ class manager {
         \stdClass $post,
         \stdClass $thread,
         \context $context,
+        array $renderctx,
         bool $canviewfullnames,
         bool $canmanageposts,
         bool $candeleteany,
@@ -655,8 +620,9 @@ class manager {
     ): array {
         global $USER, $DB;
 
-        $author = self::$userscache[(int)$post->userid]
-            ?? $DB->get_record('user', ['id' => $post->userid]);
+        $authorid = (int)$post->userid;
+        $author = $renderctx['users'][$authorid] ?? $DB->get_record('user', ['id' => $authorid]);
+        $authorroles = $renderctx['roles'][$authorid] ?? null;
 
         $isanon = false;
         $handle = '';
@@ -675,8 +641,8 @@ class manager {
                 'height' => 48,
             ]);
         } else if ($author) {
-            $isstudent = self::user_is_student($context, (int)$author->id);
-            $rolelabel = self::user_role_label($context, (int)$author->id);
+            $isstudent = self::user_is_student($context, (int)$author->id, $authorroles);
+            $rolelabel = self::user_role_label($context, (int)$author->id, $authorroles);
 
             if ($thread->anonymous && $isstudent) {
                 [$handle, ] = handles::get_or_assign($thread, (int)$author->id);
@@ -699,7 +665,10 @@ class manager {
             }
         }
 
-        $votes = self::vote_summary((int)$post->id, (int)$USER->id);
+        $postid = (int)$post->id;
+        $up = (int)($renderctx['votecounts'][$postid]['up'] ?? 0);
+        $down = (int)($renderctx['votecounts'][$postid]['down'] ?? 0);
+        $my = (int)($renderctx['myvotes'][$postid] ?? 0);
 
         $candelete = !$post->deleted && (
             ($isown && $candeleteown) || $candeleteany
@@ -709,7 +678,7 @@ class manager {
         );
 
         return [
-            'id' => (int)$post->id,
+            'id' => $postid,
             'parentid' => (int)$post->parentid,
             'content' => $post->deleted ? '' : format_text(
                 $post->content,
@@ -726,9 +695,9 @@ class manager {
             'isanonymous' => $isanon,
             'profileurl' => $profileurl,
             'avatar' => $avatar,
-            'votes_up' => (int)$votes['up'],
-            'votes_down' => (int)$votes['down'],
-            'votes_my' => (int)$votes['my'],
+            'votes_up' => $up,
+            'votes_down' => $down,
+            'votes_my' => $my,
             'canedit' => $canedit,
             'candelete' => $candelete,
             'canreply' => has_capability('filter/embeddiscussion:createpost', $context),
@@ -839,7 +808,7 @@ class manager {
         }
 
         $context = \context::instance_by_id((int)$thread->contextid);
-        self::prefetch_post_data($posts, $context, (int)$USER->id);
+        $renderctx = self::build_render_context($posts, $context, (int)$USER->id);
         $canviewfullnames = has_capability('moodle/site:viewfullnames', $context);
 
         $postsout = [];
@@ -848,6 +817,7 @@ class manager {
                 $p,
                 $thread,
                 $context,
+                $renderctx,
                 $canviewfullnames,
                 false,
                 false,
