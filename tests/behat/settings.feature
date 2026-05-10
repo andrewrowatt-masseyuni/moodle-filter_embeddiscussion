@@ -27,9 +27,11 @@ Feature: Anonymous thread settings driven by token type
     And the following "mod_book > chapters" exist:
       | book      | title     | content                                |
       | Discuss A | Chapter 1 | {anondiscussion:Settings demo}         |
+    # Pre-create the thread with anonymous=1; without filter/embeddiscussion:createthread
+    # a student visit cannot flip the flag from the token at runtime.
     And the following "filter_embeddiscussion > threads" exist:
-      | name          | course | activity |
-      | Settings demo | C1     | book1    |
+      | name          | course | activity | anonymous |
+      | Settings demo | C1     | book1    | 1         |
     And the following "filter_embeddiscussion > posts" exist:
       | thread        | user     | content                |
       | Settings demo | student1 | Hello from a student   |
@@ -46,9 +48,11 @@ Feature: Anonymous thread settings driven by token type
     And the following "mod_book > chapters" exist:
       | book      | title     | content                                     |
       | Discuss A | Chapter 1 | {anonymousdiscussion:Settings demo alias}   |
+    # Pre-create the thread with anonymous=1; without filter/embeddiscussion:createthread
+    # a student visit cannot flip the flag from the token at runtime.
     And the following "filter_embeddiscussion > threads" exist:
-      | name                | course | activity |
-      | Settings demo alias | C1     | book1    |
+      | name                | course | activity | anonymous |
+      | Settings demo alias | C1     | book1    | 1         |
     And the following "filter_embeddiscussion > posts" exist:
       | thread              | user     | content                |
       | Settings demo alias | student1 | Hello from a student   |

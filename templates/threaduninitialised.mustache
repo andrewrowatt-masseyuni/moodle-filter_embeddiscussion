@@ -1,0 +1,12 @@
+{{!
+    @template filter_embeddiscussion/threaduninitialised
+
+    Shown in place of an embedded discussion when the current user cannot
+    initialise the thread (no filter/embeddiscussion:createthread capability)
+    and no editor has visited the page yet to create it.
+
+    Example context (json): {}
+}}
+<div class="alert alert-info" data-region="filter-embeddiscussion-uninitialised">
+    {{#str}}threaduninitialised, filter_embeddiscussion{{/str}}
+</div>

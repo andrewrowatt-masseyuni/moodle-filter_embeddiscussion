@@ -84,6 +84,7 @@ final class text_filter_test extends \advanced_testcase {
 
     public function test_filter_replaces_discussion_token_with_skeleton(): void {
         $this->resetAfterTest();
+        $this->setAdminUser();
         $context = \context_system::instance();
         $filter = $this->create_book_filter($context);
         $output = $filter->filter('Before {discussion:My thread} after');
@@ -101,6 +102,7 @@ final class text_filter_test extends \advanced_testcase {
 
     public function test_filter_supports_anondiscussion_token(): void {
         $this->resetAfterTest();
+        $this->setAdminUser();
         $context = \context_system::instance();
         $filter = $this->create_book_filter($context);
         $output = $filter->filter('{anondiscussion:Alt}');
@@ -112,6 +114,7 @@ final class text_filter_test extends \advanced_testcase {
 
     public function test_filter_supports_anonymousdiscussion_alias(): void {
         $this->resetAfterTest();
+        $this->setAdminUser();
         $context = \context_system::instance();
         $filter = $this->create_book_filter($context);
         $output = $filter->filter('{anonymousdiscussion:Alias}');
@@ -123,6 +126,7 @@ final class text_filter_test extends \advanced_testcase {
 
     public function test_filter_stores_threadname_for_explicit_name(): void {
         $this->resetAfterTest();
+        $this->setAdminUser();
         $context = \context_system::instance();
         $filter = $this->create_book_filter($context);
         $filter->filter('{discussion:lesson-2}');
@@ -133,6 +137,7 @@ final class text_filter_test extends \advanced_testcase {
 
     public function test_filter_handles_multiple_tokens(): void {
         $this->resetAfterTest();
+        $this->setAdminUser();
         $context = \context_system::instance();
         $filter = $this->create_book_filter($context);
         $output = $filter->filter('{discussion:A} mid {anondiscussion:B}');
@@ -162,6 +167,7 @@ final class text_filter_test extends \advanced_testcase {
     public function test_filter_defaults_thread_name_to_page_name_in_book_context(): void {
         global $PAGE;
         $this->resetAfterTest();
+        $this->setAdminUser();
 
         $course = $this->getDataGenerator()->create_course();
         $book = $this->getDataGenerator()->create_module('book', [
@@ -189,6 +195,7 @@ final class text_filter_test extends \advanced_testcase {
     public function test_filter_defaults_anonymous_thread_name_to_page_name_in_book_context(): void {
         global $PAGE;
         $this->resetAfterTest();
+        $this->setAdminUser();
 
         $course = $this->getDataGenerator()->create_course();
         $book = $this->getDataGenerator()->create_module('book', [
@@ -215,6 +222,7 @@ final class text_filter_test extends \advanced_testcase {
     public function test_filter_leaves_nameless_token_when_page_title_unavailable_in_book_context(): void {
         global $PAGE;
         $this->resetAfterTest();
+        $this->setAdminUser();
 
         $course = $this->getDataGenerator()->create_course();
         $book = $this->getDataGenerator()->create_module('book', [
@@ -240,16 +248,44 @@ final class text_filter_test extends \advanced_testcase {
         $this->assertStringContainsString('data-threadid="' . (int)$thread->id . '"', $output);
     }
 
-    public function test_filter_defaults_nameless_token_to_context_key_outside_book_for_non_editor(): void {
+    public function test_filter_shows_uninitialised_notice_when_user_lacks_createthread_capability(): void {
         $this->resetAfterTest();
-        $context = \context_system::instance();
+        $course = $this->getDataGenerator()->create_course();
+        $student = $this->getDataGenerator()->create_and_enrol($course, 'student');
+        $context = \context_course::instance($course->id);
+        $this->setUser($student);
+
         $filter = new text_filter($context, []);
         $output = $filter->filter('Before {discussion} after');
         $threadname = 'context-' . (int)$context->id;
-        $thread = manager::find_thread($threadname, $context->id);
 
+        // The student cannot initialise the thread, so no record is created, but a
+        // student-friendly notice replaces the raw token.
+        $this->assertNull(manager::find_thread($threadname, $context->id));
+        $this->assertStringNotContainsString('data-region="filter-embeddiscussion"', $output);
+        $this->assertStringContainsString('data-region="filter-embeddiscussion-uninitialised"', $output);
+        $this->assertStringContainsString('advise your teaching team', $output);
+        $this->assertStringNotContainsString('{discussion}', $output);
+    }
+
+    public function test_filter_renders_existing_thread_for_student_without_createthread(): void {
+        $this->resetAfterTest();
+        $course = $this->getDataGenerator()->create_course();
+        $student = $this->getDataGenerator()->create_and_enrol($course, 'student');
+        $context = \context_course::instance($course->id);
+
+        // An editor visits first and initialises the thread.
+        $this->setAdminUser();
+        $filter = new text_filter($context, []);
+        $filter->filter('{discussion}');
+        $threadname = 'context-' . (int)$context->id;
+        $thread = manager::find_thread($threadname, $context->id);
         $this->assertNotNull($thread);
-        $this->assertSame($threadname, $this->get_thread_name($thread));
+
+        // The student now sees the rendered placeholder for the existing thread.
+        $this->setUser($student);
+        $studentfilter = new text_filter($context, []);
+        $output = $studentfilter->filter('{discussion}');
         $this->assertStringContainsString('data-region="filter-embeddiscussion"', $output);
         $this->assertStringContainsString('data-threadid="' . (int)$thread->id . '"', $output);
     }
@@ -279,6 +315,7 @@ final class text_filter_test extends \advanced_testcase {
 
     public function test_filter_renders_named_discussion_token_outside_book_context(): void {
         $this->resetAfterTest();
+        $this->setAdminUser();
         $context = \context_system::instance();
         $filter = new text_filter($context, []);
         $output = $filter->filter('Before {discussion:My thread} after');
@@ -348,6 +385,7 @@ final class text_filter_test extends \advanced_testcase {
     public function test_filter_renders_legacy_disqus_token(): void {
         global $PAGE;
         $this->resetAfterTest();
+        $this->setAdminUser();
         $this->configure_legacy_token_handling(true, false);
 
         $course = $this->getDataGenerator()->create_course();
@@ -374,6 +412,7 @@ final class text_filter_test extends \advanced_testcase {
     public function test_filter_renders_legacy_comments_token(): void {
         global $PAGE;
         $this->resetAfterTest();
+        $this->setAdminUser();
         $this->configure_legacy_token_handling(false, true);
 
         $course = $this->getDataGenerator()->create_course();

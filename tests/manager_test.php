@@ -38,6 +38,7 @@ final class manager_test extends \advanced_testcase {
 
     public function test_get_or_create_thread_is_idempotent(): void {
         $this->resetAfterTest();
+        $this->setAdminUser();
         $course = $this->getDataGenerator()->create_course();
         $context = \context_course::instance($course->id);
 
@@ -51,11 +52,54 @@ final class manager_test extends \advanced_testcase {
 
     public function test_get_or_create_thread_persists_threadname(): void {
         $this->resetAfterTest();
+        $this->setAdminUser();
         $course = $this->getDataGenerator()->create_course();
         $context = \context_course::instance($course->id);
 
         $thread = manager::get_or_create_thread('Test thread', $context, 'Visible thread name');
         $this->assertSame('Visible thread name', $this->get_thread_name($thread));
+    }
+
+    public function test_get_or_create_thread_requires_createthread_capability(): void {
+        $this->resetAfterTest();
+        $course = $this->getDataGenerator()->create_course();
+        $context = \context_course::instance($course->id);
+        $student = $this->getDataGenerator()->create_and_enrol($course, 'student');
+
+        $this->setUser($student);
+        $this->expectException(\required_capability_exception::class);
+        manager::get_or_create_thread('No-cap thread', $context);
+    }
+
+    public function test_get_or_create_thread_returns_existing_for_user_without_createthread(): void {
+        $this->resetAfterTest();
+        $course = $this->getDataGenerator()->create_course();
+        $context = \context_course::instance($course->id);
+        $student = $this->getDataGenerator()->create_and_enrol($course, 'student');
+
+        $this->setAdminUser();
+        $created = manager::get_or_create_thread('Shared', $context, 'Original name');
+
+        // Student inherits the existing thread without an exception, but cannot rename it.
+        $this->setUser($student);
+        $fetched = manager::get_or_create_thread('Shared', $context, 'Student-renamed');
+        $this->assertSame((int)$created->id, (int)$fetched->id);
+        $this->assertSame('Original name', $this->get_thread_name($fetched));
+    }
+
+    public function test_sync_settings_from_token_skips_when_user_lacks_createthread(): void {
+        $this->resetAfterTest();
+        $course = $this->getDataGenerator()->create_course();
+        $context = \context_course::instance($course->id);
+        $student = $this->getDataGenerator()->create_and_enrol($course, 'student');
+
+        $this->setAdminUser();
+        $thread = manager::get_or_create_thread('Settings', $context);
+        $this->assertSame(0, (int)$thread->anonymous);
+
+        $this->setUser($student);
+        $unchanged = manager::sync_settings_from_token($thread, ['anonymous' => true]);
+        $this->assertSame(0, (int)$unchanged->anonymous);
     }
 
     public function test_create_post_and_view(): void {
@@ -65,6 +109,7 @@ final class manager_test extends \advanced_testcase {
         $teacher = $this->getDataGenerator()->create_and_enrol($course, 'editingteacher');
         $student = $this->getDataGenerator()->create_and_enrol($course, 'student');
 
+        $this->setUser($teacher);
         $thread = manager::get_or_create_thread('Demo', $context);
 
         $this->setUser($student);
@@ -89,6 +134,7 @@ final class manager_test extends \advanced_testcase {
 
     public function test_create_and_edit_post_when_thread_allows_writes(): void {
         $this->resetAfterTest();
+        $this->setAdminUser();
         $course = $this->getDataGenerator()->create_course();
         $context = \context_course::instance($course->id);
         $student = $this->getDataGenerator()->create_and_enrol($course, 'student');
@@ -103,6 +149,7 @@ final class manager_test extends \advanced_testcase {
 
     public function test_voting_counts_and_toggle(): void {
         $this->resetAfterTest();
+        $this->setAdminUser();
         $course = $this->getDataGenerator()->create_course();
         $context = \context_course::instance($course->id);
         $author = $this->getDataGenerator()->create_and_enrol($course, 'student');
@@ -128,6 +175,7 @@ final class manager_test extends \advanced_testcase {
 
     public function test_anonymous_handles_assigned_in_order(): void {
         $this->resetAfterTest();
+        $this->setAdminUser();
         $course = $this->getDataGenerator()->create_course();
         $context = \context_course::instance($course->id);
         $alice = $this->getDataGenerator()->create_and_enrol($course, 'student');
@@ -177,6 +225,7 @@ final class manager_test extends \advanced_testcase {
     public function test_get_dashboard_view_returns_latest_posts_and_unread_markers(): void {
         global $DB;
         $this->resetAfterTest();
+        $this->setAdminUser();
         $course = $this->getDataGenerator()->create_course();
         $coursecontext = \context_course::instance($course->id);
         $student = $this->getDataGenerator()->create_and_enrol($course, 'student');

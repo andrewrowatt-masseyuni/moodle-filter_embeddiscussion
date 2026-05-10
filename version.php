@@ -26,7 +26,7 @@ defined('MOODLE_INTERNAL') || die();
 
 $plugin->component    = 'filter_embeddiscussion';
 $plugin->release      = '1.0';
-$plugin->version      = 2026051000;
+$plugin->version      = 2026051001;
 $plugin->requires     = 2024100700;
 $plugin->supported    = [405, 501];
 $plugin->maturity     = MATURITY_STABLE;

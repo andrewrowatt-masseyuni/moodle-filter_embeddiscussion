@@ -23,6 +23,9 @@ Feature: Embedded discussion filter
     And the following "mod_book > chapters" exist:
       | book      | title     | content                              |
       | Discuss A | Chapter 1 | {discussion:Course 1 Demo}           |
+    And the following "filter_embeddiscussion > threads" exist:
+      | name          | course | activity |
+      | Course 1 Demo | C1     | book1    |
 
   @javascript
   Scenario: Plugin appears in the additional plugins list

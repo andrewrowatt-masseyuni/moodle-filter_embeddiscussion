@@ -226,6 +226,10 @@ class text_filter extends \core_filters\text_filter {
             $thread = manager::sync_settings_from_token($thread, [
                 'anonymous' => $anonymous,
             ]);
+        } catch (\required_capability_exception $e) {
+            // The thread does not exist yet and this user cannot initialise one.
+            // Surface a friendly notice rather than leaving the raw token visible.
+            return $output->render_from_template('filter_embeddiscussion/threaduninitialised', []);
         } catch (\Throwable $e) {
             return null;
         }

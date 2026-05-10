@@ -30,6 +30,10 @@ Feature: Legacy filter_disqus and {comments} tokens are accepted as drop-in repl
     And the following "mod_book > chapters" exist:
       | book      | title     | content            |
       | Discuss A | Chapter 1 | [[filter_disqus]]  |
+    # An editor visit initialises the thread (filter/embeddiscussion:createthread).
+    And I am on the "Discuss A" "book activity" page logged in as "teacher1"
+    And the embedded discussion is loaded
+    And I log out
     When I log in as "student1"
     And I am on the "Discuss A" "book activity" page
     Then "[data-region='filter-embeddiscussion'][data-threadid]" "css_element" should exist
@@ -56,6 +60,10 @@ Feature: Legacy filter_disqus and {comments} tokens are accepted as drop-in repl
     And the following "mod_book > chapters" exist:
       | book      | title     | content     |
       | Discuss A | Chapter 1 | {comments}  |
+    # An editor visit initialises the thread (filter/embeddiscussion:createthread).
+    And I am on the "Discuss A" "book activity" page logged in as "teacher1"
+    And the embedded discussion is loaded
+    And I log out
     When I log in as "student1"
     And I am on the "Discuss A" "book activity" page
     Then "[data-region='filter-embeddiscussion'][data-threadid]" "css_element" should exist

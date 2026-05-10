@@ -146,17 +146,24 @@ class manager {
 
         $existing = self::find_thread($idnumber, $context->id);
         if ($existing) {
-            $changed = false;
-            if ($threadname !== '' && (string)($existing->threadname ?? '') !== $threadname) {
+            // Refresh the threadname from the token only when the viewer is allowed to
+            // mutate the thread record. Read-only viewers fall through unchanged so the
+            // discussion still renders for them.
+            if (
+                $threadname !== ''
+                && (string)($existing->threadname ?? '') !== $threadname
+                && has_capability('filter/embeddiscussion:createthread', $context)
+            ) {
                 $existing->threadname = $threadname;
-                $changed = true;
-            }
-            if ($changed) {
                 $existing->timemodified = time();
                 $DB->update_record('filter_embeddiscussion_thread', $existing);
             }
             return $existing;
         }
+
+        // Initialising the thread requires the createthread capability. The text filter
+        // catches this exception so users without it just see no embedded discussion.
+        require_capability('filter/embeddiscussion:createthread', $context);
 
         // Discover an enclosing course id, if any.
         $courseid = 0;
@@ -207,6 +214,11 @@ class manager {
      */
     public static function sync_settings_from_token(\stdClass $thread, array $settings): \stdClass {
         global $DB;
+
+        $context = \context::instance_by_id((int)$thread->contextid, IGNORE_MISSING);
+        if (!$context || !has_capability('filter/embeddiscussion:createthread', $context)) {
+            return $thread;
+        }
 
         $changed = false;
         if (array_key_exists('anonymous', $settings)) {

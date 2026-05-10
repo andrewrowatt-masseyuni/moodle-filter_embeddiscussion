@@ -35,6 +35,11 @@ Feature: Nameless tokens outside Book embed discussions
     Given the following "activities" exist:
       | activity | course | name               | intro                                                          | idnumber |
       | label    | C1     | Unsupported label  | Before {discussion} after                                      | label1   |
+    # An editor visit initialises the thread (filter/embeddiscussion:createthread).
+    And I log in as "teacher1"
+    And I am on "Course 1" course homepage
+    And the embedded discussion is loaded
+    And I log out
     When I log in as "student1"
     And I am on "Course 1" course homepage
     Then the embedded discussion is loaded
@@ -58,6 +63,10 @@ Feature: Nameless tokens outside Book embed discussions
     Given the following "activities" exist:
       | activity | course | name              | intro      | content                                                      | idnumber |
       | page     | C1     | Unsupported page  | Page desc  | Before {discussion} after                                    | page1    |
+    # An editor visit initialises the thread (filter/embeddiscussion:createthread).
+    And I am on the "Unsupported page" "page activity" page logged in as "teacher1"
+    And the embedded discussion is loaded
+    And I log out
     When I am on the "Unsupported page" "page activity" page logged in as "student1"
     Then the embedded discussion is loaded
     And I should not see "{discussion}"

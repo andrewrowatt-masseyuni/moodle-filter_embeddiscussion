@@ -26,6 +26,10 @@ Feature: Discussion tokens with no thread name default to the page name in Book 
     And the following "mod_book > chapters" exist:
       | book      | title     | content         |
       | Discuss A | Chapter 1 | {discussion}    |
+    # An editor visit initialises the thread (filter/embeddiscussion:createthread).
+    And I am on the "Discuss A" "book activity" page logged in as "teacher1"
+    And the embedded discussion is loaded
+    And I log out
     When I log in as "student1"
     And I am on the "Discuss A" "book activity" page
     Then "[data-region='filter-embeddiscussion'][data-threadid]" "css_element" should exist
@@ -39,6 +43,10 @@ Feature: Discussion tokens with no thread name default to the page name in Book 
     And the following "mod_book > chapters" exist:
       | book      | title     | content             |
       | Discuss A | Chapter 1 | {anondiscussion}    |
+    # An editor visit initialises the thread and writes anonymous=1 from the token.
+    And I am on the "Discuss A" "book activity" page logged in as "teacher1"
+    And the embedded discussion is loaded
+    And I log out
     When I log in as "student1"
     And I am on the "Discuss A" "book activity" page
     Then "[data-region='filter-embeddiscussion'][data-threadid]" "css_element" should exist
@@ -52,6 +60,10 @@ Feature: Discussion tokens with no thread name default to the page name in Book 
     And the following "mod_book > chapters" exist:
       | book      | title     | content                  |
       | Discuss A | Chapter 1 | {anonymousdiscussion}    |
+    # An editor visit initialises the thread and writes anonymous=1 from the token.
+    And I am on the "Discuss A" "book activity" page logged in as "teacher1"
+    And the embedded discussion is loaded
+    And I log out
     When I log in as "student1"
     And I am on the "Discuss A" "book activity" page
     Then "[data-region='filter-embeddiscussion'][data-threadid]" "css_element" should exist
@@ -65,6 +77,9 @@ Feature: Discussion tokens with no thread name default to the page name in Book 
     And the following "mod_book > chapters" exist:
       | book      | title     | content                     |
       | Discuss A | Chapter 1 | {discussion:Named thread}   |
+    And the following "filter_embeddiscussion > threads" exist:
+      | name         | course | activity |
+      | Named thread | C1     | book1    |
     When I log in as "student1"
     And I am on the "Discuss A" "book activity" page
     Then "[data-region='filter-embeddiscussion'][data-threadid]" "css_element" should exist
