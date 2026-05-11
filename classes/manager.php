@@ -296,8 +296,14 @@ class manager {
         ];
         $record->id = $DB->insert_record('filter_embeddiscussion_post', $record);
 
-        // If anonymous mode is on and the user is a student, lock in their handle now.
-        if ($thread->anonymous && self::user_is_student($context, $userid)) {
+        // If anonymous mode is on and the user can't see real authors, lock in their handle now.
+        if (
+            $thread->anonymous && !has_capability(
+                'filter/embeddiscussion:viewallauthorsinanonymousthreads',
+                $context,
+                $userid
+            )
+        ) {
             handles::get_or_assign($thread, $userid);
         }
 
@@ -476,36 +482,6 @@ class manager {
     }
 
     /**
-     * Determine whether a user has the student archetype in this context.
-     *
-     * Render paths pass the prefetched roles array from build_render_context;
-     * write paths (e.g. create_post) omit it and pay one DB lookup.
-     *
-     * @param \context $context
-     * @param int $userid
-     * @param array|null $roles pre-fetched role assignments, or null to look up
-     * @return bool
-     */
-    public static function user_is_student(\context $context, int $userid, ?array $roles = null): bool {
-        // Use only directly assigned roles; archetype 'student' or no role at all means treat as student.
-        $roles ??= get_user_roles($context, $userid, true);
-        if (empty($roles)) {
-            return true;
-        }
-        $hasstudent = false;
-        $hasnonstudent = false;
-        foreach ($roles as $r) {
-            $archetype = self::role_archetype((int)$r->roleid);
-            if ($archetype === 'student' || $archetype === '' || $archetype === 'guest') {
-                $hasstudent = true;
-            } else {
-                $hasnonstudent = true;
-            }
-        }
-        return $hasstudent && !$hasnonstudent;
-    }
-
-    /**
      * Get a user's primary non-student role in this context (display label).
      *
      * @param \context $context
@@ -584,7 +560,10 @@ class manager {
         }
 
         $currentuserisanonymous = (bool)$thread->anonymous
-            && self::user_is_student($context, (int)$USER->id);
+            && !has_capability(
+                'filter/embeddiscussion:viewallauthorsinanonymousthreads',
+                $context
+            );
 
         return [
             'threadid' => (int)$thread->id,
@@ -653,10 +632,14 @@ class manager {
                 'height' => 48,
             ]);
         } else if ($author) {
-            $isstudent = self::user_is_student($context, (int)$author->id, $authorroles);
+            $canseeauthor = has_capability(
+                'filter/embeddiscussion:viewallauthorsinanonymousthreads',
+                $context,
+                (int)$author->id
+            );
             $rolelabel = self::user_role_label($context, (int)$author->id, $authorroles);
 
-            if ($thread->anonymous && $isstudent) {
+            if ($thread->anonymous && !$canseeauthor) {
                 [$handle, ] = handles::get_or_assign($thread, (int)$author->id);
                 $isanon = true;
             }
