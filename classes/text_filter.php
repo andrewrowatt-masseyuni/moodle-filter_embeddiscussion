@@ -254,7 +254,7 @@ class text_filter extends \core_filters\text_filter {
 
         [, , $cm] = get_context_info_array($this->context->id);
 
-        if (($cm->modname ?? '') === 'book' && $PAGE->url->get_path() === '/mod/book/view.php' && !empty($PAGE->title)) {
+        if (($cm->modname ?? '') === 'book' && $PAGE->url->get_path() === '/mod/book/view.php' && ($PAGE->title ?? '') !== '') {
             return $PAGE->title;
         }
 

@@ -84,6 +84,53 @@ class behat_filter_embeddiscussion extends behat_base {
     }
 
     /**
+     * Compose and submit a top-level comment in the embedded discussion.
+     *
+     * Opens the collapsed composer, types the content into the Quill editor and
+     * clicks the Comment button. The editor is a contenteditable region rather
+     * than a form field, so the content is written directly into it.
+     *
+     * @When /^I post "(?P<content>[^"]*)" to the embedded discussion$/
+     * @param string $content the comment text
+     */
+    public function i_post_to_the_embedded_discussion(string $content): void {
+        // Open the composer; the Quill editor loads lazily once it is expanded.
+        $this->execute('behat_general::i_click_on', [
+            "[data-region='composer'] [data-action='open-composer']",
+            'css_element',
+        ]);
+        $this->ensure_element_exists("[data-region='composer-expanded'] .ql-editor", 'css_element');
+
+        // Quill exposes the contenteditable as .ql-editor; submitComposer() reads its
+        // innerHTML directly, so writing the markup here is sufficient to post.
+        $contentjs = json_encode('<p>' . $content . '</p>');
+        $script = <<<JS
+            (function() {
+                var editor = document.querySelector('[data-region="composer-expanded"] .ql-editor');
+                if (!editor) {
+                    return 'no-editor';
+                }
+                editor.innerHTML = $contentjs;
+                return 'ok';
+            })();
+JS;
+        $result = $this->evaluate_script($script);
+        if ($result !== 'ok') {
+            throw new ExpectationException(
+                "Could not type into the embedded discussion composer ($result)",
+                $this->getSession()
+            );
+        }
+
+        // Submit the comment and let the thread re-render.
+        $this->execute('behat_general::i_click_on', [
+            "[data-region='composer-expanded'] [data-action='submit-compose']",
+            'css_element',
+        ]);
+        $this->wait_for_pending_js();
+    }
+
+    /**
      * Click an action button (by visible text) on the post that contains the given snippet.
      *
      * @When /^I click "(?P<label>[^"]*)" on the embedded discussion post containing "(?P<needle>[^"]*)"$/
