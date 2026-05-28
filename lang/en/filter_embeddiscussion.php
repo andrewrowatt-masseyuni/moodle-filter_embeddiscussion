@@ -59,6 +59,7 @@ $string['event:post_created'] = 'Embedded discussion post created';
 $string['event:post_deleted'] = 'Embedded discussion post deleted';
 $string['event:post_edited'] = 'Embedded discussion post edited';
 $string['event:post_voted'] = 'Embedded discussion post voted on';
+$string['event:thread_deleted'] = 'Embedded discussion thread deleted';
 $string['event:thread_initialised'] = 'Embedded discussion thread initialised';
 $string['filtername'] = 'Embedded discussion';
 $string['jointhediscussion'] = 'Join the discussion…';

@@ -123,6 +123,69 @@ class manager {
     }
 
     /**
+     * Delete every thread anchored to any of the given contexts, along with the
+     * posts, votes and anonymous handles that hang off them.
+     *
+     * Used when Moodle deletes a context (course, module or block) so the
+     * orphaned discussion data does not outlive the thing it was embedded in.
+     * A {@see \filter_embeddiscussion\event\post_deleted} event is emitted for
+     * each post and a {@see \filter_embeddiscussion\event\thread_deleted} event
+     * for each thread.
+     *
+     * @param int[] $contextids context ids whose threads should be removed
+     */
+    public static function delete_threads_for_contexts(array $contextids): void {
+        global $DB;
+
+        $contextids = array_values(array_unique(array_filter(array_map('intval', $contextids))));
+        if (empty($contextids)) {
+            return;
+        }
+
+        [$insql, $params] = $DB->get_in_or_equal($contextids, SQL_PARAMS_NAMED, 'ctx');
+        $threads = $DB->get_records_select('filter_embeddiscussion_thread', "contextid $insql", $params);
+        foreach ($threads as $thread) {
+            self::delete_thread($thread);
+        }
+    }
+
+    /**
+     * Delete a single thread and all data hanging off it, emitting a
+     * post_deleted event per post and a thread_deleted event for the thread.
+     *
+     * Events are triggered while the rows still exist so observers can read
+     * the records being removed.
+     *
+     * @param \stdClass $thread
+     */
+    protected static function delete_thread(\stdClass $thread): void {
+        global $DB;
+
+        $context = \context::instance_by_id((int)$thread->contextid, IGNORE_MISSING);
+
+        $posts = $DB->get_records('filter_embeddiscussion_post', ['threadid' => $thread->id]);
+
+        if ($context) {
+            foreach ($posts as $post) {
+                \filter_embeddiscussion\event\post_deleted::create_for_post($post, $thread, $context)->trigger();
+            }
+        }
+
+        if ($posts) {
+            [$insql, $params] = $DB->get_in_or_equal(array_keys($posts), SQL_PARAMS_NAMED, 'p');
+            $DB->delete_records_select('filter_embeddiscussion_vote', "postid $insql", $params);
+        }
+        $DB->delete_records('filter_embeddiscussion_handle', ['threadid' => $thread->id]);
+        $DB->delete_records('filter_embeddiscussion_post', ['threadid' => $thread->id]);
+
+        if ($context) {
+            \filter_embeddiscussion\event\thread_deleted::create_for_thread($thread, $context)->trigger();
+        }
+
+        $DB->delete_records('filter_embeddiscussion_thread', ['id' => $thread->id]);
+    }
+
+    /**
      * Get or create the thread for an idnumber+context. Creation is logged.
      *
      * @param string $idnumber

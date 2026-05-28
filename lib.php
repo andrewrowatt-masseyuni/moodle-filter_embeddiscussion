@@ -55,3 +55,53 @@ function filter_embeddiscussion_extend_navigation_course(
     );
     $navigation->add_node($node);
 }
+
+/**
+ * Delete embedded discussion threads anchored anywhere in a course before the
+ * course (and all of its child contexts) is removed.
+ *
+ * Course deletion removes module and block contexts directly without firing
+ * their own pre-delete callbacks, so the whole course context subtree is
+ * cleaned here.
+ *
+ * @param stdClass $course the course being deleted
+ */
+function filter_embeddiscussion_pre_course_delete(stdClass $course) {
+    $context = context_course::instance($course->id, IGNORE_MISSING);
+    if (!$context) {
+        return;
+    }
+    $contextids = [(int)$context->id];
+    foreach ($context->get_child_contexts() as $child) {
+        $contextids[] = (int)$child->id;
+    }
+    \filter_embeddiscussion\manager::delete_threads_for_contexts($contextids);
+}
+
+/**
+ * Delete embedded discussion threads anchored to a course module before it is
+ * removed. Blocks placed on the module page are handled by their own
+ * pre_block_delete callback when the module context is deleted.
+ *
+ * @param stdClass $cm the course module being deleted
+ */
+function filter_embeddiscussion_pre_course_module_delete(stdClass $cm) {
+    $context = context_module::instance($cm->id, IGNORE_MISSING);
+    if (!$context) {
+        return;
+    }
+    \filter_embeddiscussion\manager::delete_threads_for_contexts([(int)$context->id]);
+}
+
+/**
+ * Delete embedded discussion threads anchored to a block before it is removed.
+ *
+ * @param stdClass $instance the block instance being deleted
+ */
+function filter_embeddiscussion_pre_block_delete(stdClass $instance) {
+    $context = context_block::instance($instance->id, IGNORE_MISSING);
+    if (!$context) {
+        return;
+    }
+    \filter_embeddiscussion\manager::delete_threads_for_contexts([(int)$context->id]);
+}
