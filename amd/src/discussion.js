@@ -27,6 +27,7 @@ import Notification from 'core/notification';
 import {get_string as getString} from 'core/str';
 import {loadQuill, makeEditor} from 'filter_embeddiscussion/editor';
 import {startTicker, tick as tickTimeAgo, format} from 'filter_embeddiscussion/timeago';
+import {renderReactionsBarInto, openPicker, closeAllPickers} from 'filter_embeddiscussion/reactions';
 
 const SEL_ROOT = '[data-region="filter-embeddiscussion"]';
 const MAX_VISUAL_INDENT = 3;
@@ -38,6 +39,24 @@ const HASH_POST_RE = /^#embeddisc-post-(\d+)$/;
 const initialised = new WeakSet();
 
 let lazyObserver = null;
+let pickerCloserBound = false;
+
+/**
+ * Close any open emoji picker when the user clicks outside a reactions bar.
+ * Bound once for the page; clicks inside a bar are handled by the discussion's
+ * own delegated handler.
+ */
+const bindPickerCloser = () => {
+    if (pickerCloserBound) {
+        return;
+    }
+    pickerCloserBound = true;
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('[data-region="reactions-bar"]')) {
+            closeAllPickers();
+        }
+    });
+};
 
 const getLazyObserver = () => {
     if (lazyObserver || typeof IntersectionObserver === 'undefined') {
@@ -73,6 +92,7 @@ const targetedPostId = () => {
  * deferring the thread fetch until each placeholder is near the viewport.
  */
 export const init = () => {
+    bindPickerCloser();
     const targeted = targetedPostId();
     const observer = targeted === null ? getLazyObserver() : null;
     document.querySelectorAll(SEL_ROOT).forEach(el => {
@@ -100,6 +120,7 @@ class Discussion {
         this.root = root;
         this.threadid = parseInt(root.dataset.threadid, 10);
         this.thread = null; // Server payload.
+        this.emojis = {}; // Map of shortcode => unicode, in display order.
         this.sortMode = 'oldest';
         this.composerEditor = null;
         this.activeReply = null; // {parentId, container, editor}.
@@ -119,6 +140,10 @@ class Discussion {
 
     async render(data) {
         this.thread = data;
+        this.emojis = {};
+        (data.emojis || []).forEach(e => {
+            this.emojis[e.shortcode] = e.unicode;
+        });
         const html = await Templates.renderForPromise('filter_embeddiscussion/discussion', data);
         await Templates.replaceNodeContents(this.root, html.html, html.js);
         await this.renderPosts();
@@ -143,12 +168,7 @@ class Discussion {
         }
         container.innerHTML = '';
 
-        const posts = this.thread.posts.map(p => ({
-            ...p,
-            indent: 0,
-            votesMyUp: p.votes_my === 1,
-            votesMyDown: p.votes_my === -1,
-        }));
+        const posts = this.thread.posts.map(p => ({...p, indent: 0}));
 
         // Sort top-level by chosen mode; replies always chronological.
         const tops = posts.filter(p => p.parentid === 0);
@@ -186,6 +206,13 @@ class Discussion {
         const tmp = document.createElement('div');
         tmp.innerHTML = html;
         const node = tmp.firstElementChild;
+        // Inject the emoji reactions bar before the node is attached (no flash).
+        if (!post.deleted) {
+            await renderReactionsBarInto(node, post.reactions, {
+                emojis: this.emojis,
+                canreact: this.thread.canreact,
+            });
+        }
         container.appendChild(node);
         Templates.runTemplateJS(js);
 
@@ -218,7 +245,8 @@ class Discussion {
             case 'reply': this.openReply(target); break;
             case 'edit': this.openEdit(target); break;
             case 'delete': this.confirmDelete(target); break;
-            case 'vote': this.vote(target); break;
+            case 'open-picker': openPicker(target); break;
+            case 'toggle-reaction': this.toggleReaction(target); break;
             default:
         }
     }
@@ -443,35 +471,34 @@ class Discussion {
         }
     }
 
-    async vote(button) {
+    /**
+     * Toggle an emoji reaction on a post and re-render its reactions bar in place.
+     *
+     * @param {HTMLElement} button the clicked toggle-reaction control
+     */
+    async toggleReaction(button) {
         const postEl = button.closest('[data-region="post"]');
         if (!postEl) {
             return;
         }
         const postId = parseInt(postEl.dataset.postid, 10);
-        const direction = parseInt(button.dataset.direction, 10);
-        // Find current vote in local thread state to allow toggle off.
+        const emoji = button.dataset.emoji;
         const post = this.thread.posts.find(p => p.id === postId);
-        const finalDir = (post && post.votes_my === direction) ? 0 : direction;
+        closeAllPickers();
         try {
             const result = await Ajax.call([{
-                methodname: 'filter_embeddiscussion_vote_post',
-                args: {postid: postId, direction: finalDir},
+                methodname: 'filter_embeddiscussion_react_post',
+                args: {postid: postId, emoji},
             }])[0];
-            // Update local model and the post DOM in place.
+            const reactions = {counts: result.counts, userreactions: result.userreactions};
+            // Update local model and re-render the bar in place.
             if (post) {
-                /* eslint-disable camelcase */
-                post.votes_up = result.votes_up;
-                post.votes_down = result.votes_down;
-                post.votes_my = result.votes_my;
-                /* eslint-enable camelcase */
+                post.reactions = reactions;
             }
-            postEl.querySelector('[data-region="votes-up"]').textContent = result.votes_up;
-            postEl.querySelector('[data-region="votes-down"]').textContent = result.votes_down;
-            const upBtn = postEl.querySelector('[data-action="vote"][data-direction="1"]');
-            const downBtn = postEl.querySelector('[data-action="vote"][data-direction="-1"]');
-            upBtn.classList.toggle('active', result.votes_my === 1);
-            downBtn.classList.toggle('active', result.votes_my === -1);
+            await renderReactionsBarInto(postEl, reactions, {
+                emojis: this.emojis,
+                canreact: this.thread.canreact,
+            });
         } catch (e) {
             Notification.exception(e);
         }

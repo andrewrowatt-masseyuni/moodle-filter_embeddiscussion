@@ -18,18 +18,19 @@ namespace filter_embeddiscussion\external;
 
 use core_external\external_api;
 use core_external\external_function_parameters;
+use core_external\external_multiple_structure;
 use core_external\external_single_structure;
 use core_external\external_value;
 use filter_embeddiscussion\manager;
 
 /**
- * Up- or down-vote a post.
+ * Toggle an emoji reaction on a post.
  *
  * @package    filter_embeddiscussion
  * @copyright  2026 Andrew Rowatt <A.J.Rowatt@massey.ac.nz>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-class vote_post extends external_api {
+class react_post extends external_api {
     /**
      * Parameters definition.
      *
@@ -38,23 +39,23 @@ class vote_post extends external_api {
     public static function execute_parameters(): external_function_parameters {
         return new external_function_parameters([
             'postid' => new external_value(PARAM_INT, 'Post id'),
-            'direction' => new external_value(PARAM_INT, 'Vote direction: -1, 0, or 1'),
+            'emoji' => new external_value(PARAM_ALPHANUMEXT, 'Emoji shortcode'),
         ]);
     }
 
     /**
-     * Vote.
+     * Toggle a reaction and return the post's updated reaction state.
      *
      * @param int $postid
-     * @param int $direction
+     * @param string $emoji
      * @return array
      */
-    public static function execute(int $postid, int $direction): array {
+    public static function execute(int $postid, string $emoji): array {
         global $USER, $DB;
 
         $params = self::validate_parameters(self::execute_parameters(), [
             'postid' => $postid,
-            'direction' => $direction,
+            'emoji' => $emoji,
         ]);
 
         $post = $DB->get_record('filter_embeddiscussion_post', ['id' => $params['postid']], '*', MUST_EXIST);
@@ -68,20 +69,34 @@ class vote_post extends external_api {
         // Derive the context from the thread; never trust a client-supplied context.
         $context = \context::instance_by_id((int)$thread->contextid);
         self::validate_context($context);
+        require_capability('filter/embeddiscussion:createpost', $context);
 
-        $summary = manager::vote_post(
-            $params['postid'],
+        if ($post->deleted) {
+            throw new \moodle_exception('error_invalidthread', 'filter_embeddiscussion');
+        }
+
+        $result = manager::toggle_reaction($params['postid'], $USER->id, $params['emoji']);
+
+        \filter_embeddiscussion\event\post_reacted::create_for_post(
+            $post,
             $thread,
             $context,
-            $params['direction'],
-            $USER->id
-        );
+            $params['emoji'],
+            $result['action']
+        )->trigger();
+
+        $reactions = manager::get_reactions([$params['postid']], $USER->id);
+        $itemreactions = $reactions[$params['postid']];
+        $counts = [];
+        foreach ($itemreactions['counts'] as $emojicode => $count) {
+            $counts[] = ['emoji' => $emojicode, 'count' => $count];
+        }
 
         return [
             'postid' => (int)$post->id,
-            'votes_up' => (int)$summary['up'],
-            'votes_down' => (int)$summary['down'],
-            'votes_my' => (int)$summary['my'],
+            'action' => $result['action'],
+            'counts' => $counts,
+            'userreactions' => array_values($itemreactions['userreactions']),
         ];
     }
 
@@ -93,9 +108,16 @@ class vote_post extends external_api {
     public static function execute_returns(): external_single_structure {
         return new external_single_structure([
             'postid' => new external_value(PARAM_INT, 'Post id'),
-            'votes_up' => new external_value(PARAM_INT, 'Up votes'),
-            'votes_down' => new external_value(PARAM_INT, 'Down votes'),
-            'votes_my' => new external_value(PARAM_INT, "Viewer's own vote"),
+            'action' => new external_value(PARAM_ALPHA, 'Action taken: added or removed'),
+            'counts' => new external_multiple_structure(
+                new external_single_structure([
+                    'emoji' => new external_value(PARAM_ALPHANUMEXT, 'Emoji shortcode'),
+                    'count' => new external_value(PARAM_INT, 'Reaction count'),
+                ])
+            ),
+            'userreactions' => new external_multiple_structure(
+                new external_value(PARAM_ALPHANUMEXT, 'Emoji shortcode the viewer has reacted with')
+            ),
         ]);
     }
 }

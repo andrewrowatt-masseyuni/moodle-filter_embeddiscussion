@@ -30,15 +30,15 @@ final class context_deletion_test extends \advanced_testcase {
      * Count rows tied to a thread across every table the plugin owns.
      *
      * @param int $threadid
-     * @return array{thread:int,posts:int,votes:int,handles:int}
+     * @return array{thread:int,posts:int,reactions:int,handles:int}
      */
     protected function thread_footprint(int $threadid): array {
         global $DB;
         return [
             'thread' => $DB->count_records('filter_embeddiscussion_thread', ['id' => $threadid]),
             'posts' => $DB->count_records('filter_embeddiscussion_post', ['threadid' => $threadid]),
-            'votes' => $DB->count_records_select(
-                'filter_embeddiscussion_vote',
+            'reactions' => $DB->count_records_select(
+                'filter_embeddiscussion_reaction',
                 'postid IN (SELECT id FROM {filter_embeddiscussion_post} WHERE threadid = :tid)',
                 ['tid' => $threadid]
             ),
@@ -76,21 +76,21 @@ final class context_deletion_test extends \advanced_testcase {
         ]);
         $plugingen->create_post(['thread' => 'ctx-thread', 'userid' => $student1->id, 'content' => 'First post']);
         $plugingen->create_post(['thread' => 'ctx-thread', 'userid' => $student2->id, 'content' => 'Second post']);
-        $plugingen->create_vote([
+        $plugingen->create_reaction([
             'thread' => 'ctx-thread',
             'userid' => $student2->id,
             'postcontent' => 'First post',
-            'direction' => 1,
+            'emoji' => 'thumbsup',
         ]);
 
-        // Seeded as expected: thread, two posts, one vote, two anonymous handles.
+        // Seeded as expected: thread, two posts, one reaction, two anonymous handles.
         $before = $this->thread_footprint((int)$thread->id);
-        $this->assertSame(['thread' => 1, 'posts' => 2, 'votes' => 1, 'handles' => 2], $before);
+        $this->assertSame(['thread' => 1, 'posts' => 2, 'reactions' => 1, 'handles' => 2], $before);
 
         manager::delete_threads_for_contexts([(int)$context->id]);
 
         $after = $this->thread_footprint((int)$thread->id);
-        $this->assertSame(['thread' => 0, 'posts' => 0, 'votes' => 0, 'handles' => 0], $after);
+        $this->assertSame(['thread' => 0, 'posts' => 0, 'reactions' => 0, 'handles' => 0], $after);
     }
 
     public function test_delete_threads_for_contexts_emits_events(): void {

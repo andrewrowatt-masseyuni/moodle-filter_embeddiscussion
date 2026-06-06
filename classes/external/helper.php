@@ -29,6 +29,26 @@ use core_external\external_value;
  */
 class helper {
     /**
+     * Description of a post's reaction state: per-emoji counts plus the
+     * shortcodes the viewer has reacted with.
+     *
+     * @return external_single_structure
+     */
+    public static function reactions_structure(): external_single_structure {
+        return new external_single_structure([
+            'counts' => new external_multiple_structure(
+                new external_single_structure([
+                    'emoji' => new external_value(PARAM_ALPHANUMEXT, 'Emoji shortcode'),
+                    'count' => new external_value(PARAM_INT, 'Reaction count'),
+                ])
+            ),
+            'userreactions' => new external_multiple_structure(
+                new external_value(PARAM_ALPHANUMEXT, 'Emoji shortcode the viewer has reacted with')
+            ),
+        ]);
+    }
+
+    /**
      * Description of a single post entry.
      *
      * @return external_single_structure
@@ -48,9 +68,7 @@ class helper {
             'isanonymous' => new external_value(PARAM_BOOL, 'True if anonymised for viewer'),
             'profileurl' => new external_value(PARAM_URL, 'Author profile URL', VALUE_OPTIONAL),
             'avatar' => new external_value(PARAM_RAW, 'Avatar HTML (img tag)'),
-            'votes_up' => new external_value(PARAM_INT, 'Up vote count'),
-            'votes_down' => new external_value(PARAM_INT, 'Down vote count'),
-            'votes_my' => new external_value(PARAM_INT, "Viewer's own vote: -1, 0 or 1"),
+            'reactions' => self::reactions_structure(),
             'canedit' => new external_value(PARAM_BOOL, 'Viewer can edit this post'),
             'candelete' => new external_value(PARAM_BOOL, 'Viewer can delete this post'),
             'canreply' => new external_value(PARAM_BOOL, 'Viewer can reply'),
@@ -59,7 +77,7 @@ class helper {
 
     /**
      * Description of a single dashboard post entry. Read-only subset of
-     * post_structure with a navigation URL added; no votes/edit/delete.
+     * post_structure with a navigation URL added; no reactions/edit/delete.
      *
      * @return external_single_structure
      */
@@ -124,6 +142,11 @@ class helper {
             ),
             'canpost' => new external_value(PARAM_BOOL, 'Viewer can post'),
             'canmanageposts' => new external_value(PARAM_BOOL, 'Viewer can moderate posts'),
+            'canreact' => new external_value(PARAM_BOOL, 'Viewer can react to posts'),
+            'emojis' => new external_multiple_structure(new external_single_structure([
+                'shortcode' => new external_value(PARAM_ALPHANUMEXT, 'Emoji shortcode'),
+                'unicode' => new external_value(PARAM_RAW, 'Emoji unicode character'),
+            ])),
             'postcount' => new external_value(PARAM_INT, 'Number of posts'),
             'currentuserid' => new external_value(PARAM_INT, 'Current user id'),
             'currentuseravatar' => new external_value(PARAM_RAW, 'Current user avatar HTML (img tag)'),

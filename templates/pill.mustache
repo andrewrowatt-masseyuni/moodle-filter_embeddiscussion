@@ -1,0 +1,49 @@
+{{!
+    This file is part of Moodle - http://moodle.org/
+
+    Moodle is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    Moodle is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+}}
+{{!
+    @template filter_embeddiscussion/pill
+
+    A single emoji reaction pill showing an emoji and its count. Ported from
+    local_reactions/pill. Used by reactions_bar in the (unused here) normal view.
+
+    Context is a single button object from the buttons array.
+
+    Example context (json):
+    {
+        "shortcode": "thumbsup",
+        "unicode": "👍",
+        "count": 3,
+        "hascount": true,
+        "selected": true,
+        "canreact": true
+    }
+}}
+{{#hascount}}
+    <button
+        type="button"
+        class="embeddisc-reactions-pill{{#selected}} embeddisc-reactions-selected{{/selected}}"
+        data-action="toggle-reaction"
+        data-emoji="{{shortcode}}"
+        data-count="{{count}}"
+        aria-pressed="{{#selected}}true{{/selected}}{{^selected}}false{{/selected}}"
+        aria-label="{{unicode}} {{count}}"
+        {{^canreact}}disabled{{/canreact}}
+    >
+        <span class="embeddisc-reactions-emoji" aria-hidden="true">{{unicode}}</span>
+        <span class="embeddisc-reactions-count" data-region="reaction-count">{{count}}</span>
+    </button>
+{{/hascount}}

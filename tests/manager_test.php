@@ -147,30 +147,51 @@ final class manager_test extends \advanced_testcase {
         $this->assertSame('Hello edited', strip_tags($edited->content));
     }
 
-    public function test_voting_counts_and_toggle(): void {
+    public function test_reactions_counts_and_toggle(): void {
         $this->resetAfterTest();
         $this->setAdminUser();
         $course = $this->getDataGenerator()->create_course();
         $context = \context_course::instance($course->id);
         $author = $this->getDataGenerator()->create_and_enrol($course, 'student');
-        $voter = $this->getDataGenerator()->create_and_enrol($course, 'student');
+        $reactor = $this->getDataGenerator()->create_and_enrol($course, 'student');
 
-        $thread = manager::get_or_create_thread('Votes', $context);
+        $thread = manager::get_or_create_thread('Reactions', $context);
         $this->setUser($author);
-        $post = manager::create_post($thread, $context, 0, 'Vote me', $author->id);
+        $post = manager::create_post($thread, $context, 0, 'React to me', $author->id);
 
-        $this->setUser($voter);
-        $a = manager::vote_post($post->id, $thread, $context, 1, $voter->id);
-        $this->assertEquals(['up' => 1, 'down' => 0, 'my' => 1], $a);
+        $this->setUser($reactor);
 
-        $b = manager::vote_post($post->id, $thread, $context, 1, $voter->id);
-        $this->assertEquals(1, $b['up'], 'Repeating same vote should not double-count');
+        // Adding a reaction is reflected in the counts and the user's own reactions.
+        $a = manager::toggle_reaction($post->id, $reactor->id, 'thumbsup');
+        $this->assertSame('added', $a['action']);
+        $summary = manager::get_reactions([$post->id], $reactor->id)[$post->id];
+        $this->assertSame(['thumbsup' => 1], $summary['counts']);
+        $this->assertSame(['thumbsup'], $summary['userreactions']);
 
-        $c = manager::vote_post($post->id, $thread, $context, -1, $voter->id);
-        $this->assertEquals(['up' => 0, 'down' => 1, 'my' => -1], $c);
+        // A user may stack a second, different emoji on the same post.
+        manager::toggle_reaction($post->id, $reactor->id, 'heart');
+        $summary = manager::get_reactions([$post->id], $reactor->id)[$post->id];
+        $this->assertSame(1, $summary['counts']['thumbsup']);
+        $this->assertSame(1, $summary['counts']['heart']);
+        $this->assertEqualsCanonicalizing(['thumbsup', 'heart'], $summary['userreactions']);
 
-        $d = manager::vote_post($post->id, $thread, $context, 0, $voter->id);
-        $this->assertEquals(['up' => 0, 'down' => 0, 'my' => 0], $d);
+        // Toggling the same emoji again removes just that one.
+        $b = manager::toggle_reaction($post->id, $reactor->id, 'thumbsup');
+        $this->assertSame('removed', $b['action']);
+        $summary = manager::get_reactions([$post->id], $reactor->id)[$post->id];
+        $this->assertArrayNotHasKey('thumbsup', $summary['counts']);
+        $this->assertSame(['heart'], $summary['userreactions']);
+
+        // Reactions from a different user aggregate into the per-emoji counts.
+        $other = $this->getDataGenerator()->create_and_enrol($course, 'student');
+        manager::toggle_reaction($post->id, $other->id, 'heart');
+        $summary = manager::get_reactions([$post->id], $reactor->id)[$post->id];
+        $this->assertSame(2, $summary['counts']['heart']);
+        $this->assertSame(['heart'], $summary['userreactions']);
+
+        // An emoji outside the configured set is rejected.
+        $this->expectException(\invalid_parameter_exception::class);
+        manager::toggle_reaction($post->id, $reactor->id, 'notanemoji');
     }
 
     public function test_anonymous_handles_assigned_in_order(): void {

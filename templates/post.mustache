@@ -25,14 +25,13 @@
     * isanonymous (bool)
     * profileurl (string, optional)
     * avatar (string, raw HTML)
-    * votes_up (int)
-    * votes_down (int)
-    * votes_my_up (bool)
-    * votes_my_down (bool)
     * canedit (bool)
     * candelete (bool)
     * canreply (bool)
     * indent (int 0..3, optional) — for visual nesting
+
+    The emoji reactions bar is injected into [data-region="post-actions"] by the
+    discussion JS, which has the per-post reaction data and the emoji set.
 
     Example context (json):
     {
@@ -48,10 +47,6 @@
         "isanonymous": false,
         "profileurl": "https://example.com/user/profile.php?id=2",
         "avatar": "<img class=\"userpicture\" src=\"https://example.com/u.png\" alt=\"\">",
-        "votes_up": 3,
-        "votes_down": 0,
-        "votes_my_up": false,
-        "votes_my_down": false,
         "canedit": true,
         "candelete": true,
         "canreply": true,
@@ -80,17 +75,7 @@
     {{/deleted}}
     {{^deleted}}
       <div class="embeddisc-post-content" data-region="post-content">{{{content}}}</div>
-      <div class="embeddisc-post-actions">
-        <button type="button" class="embeddisc-action embeddisc-vote {{#votes_my_up}}active{{/votes_my_up}}"
-          data-action="vote" data-direction="1" aria-label="Up vote">
-          <i class="fa-regular fa-thumbs-up" aria-hidden="true"></i>
-          <span data-region="votes-up">{{votes_up}}</span>
-        </button>
-        <button type="button" class="embeddisc-action embeddisc-vote {{#votes_my_down}}active{{/votes_my_down}}"
-          data-action="vote" data-direction="-1" aria-label="Down vote">
-          <i class="fa-regular fa-thumbs-down" aria-hidden="true"></i>
-          <span data-region="votes-down">{{votes_down}}</span>
-        </button>
+      <div class="embeddisc-post-actions" data-region="post-actions">
         {{#canedit}}
           <button type="button" class="embeddisc-action" data-action="edit" aria-label="Edit">
             <i class="fa fa-pencil" aria-hidden="true"></i>

@@ -17,13 +17,13 @@
 namespace filter_embeddiscussion\event;
 
 /**
- * Event fired when a post is voted on.
+ * Event fired when a post is reacted to.
  *
  * @package    filter_embeddiscussion
  * @copyright  2026 Andrew Rowatt <A.J.Rowatt@massey.ac.nz>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-class post_voted extends \core\event\base {
+class post_reacted extends \core\event\base {
     /**
      * Init.
      */
@@ -39,7 +39,7 @@ class post_voted extends \core\event\base {
      * @return string
      */
     public static function get_name() {
-        return get_string('event:post_voted', 'filter_embeddiscussion');
+        return get_string('event:post_reacted', 'filter_embeddiscussion');
     }
 
     /**
@@ -48,8 +48,9 @@ class post_voted extends \core\event\base {
      * @return string
      */
     public function get_description() {
-        $direction = $this->other['direction'] ?? 0;
-        return "The user with id '{$this->userid}' voted ({$direction}) on post '{$this->objectid}'.";
+        $emoji = $this->other['emoji'] ?? '';
+        $action = $this->other['action'] ?? '';
+        return "The user with id '{$this->userid}' {$action} the '{$emoji}' reaction on post '{$this->objectid}'.";
     }
 
     /**
@@ -58,21 +59,24 @@ class post_voted extends \core\event\base {
      * @param \stdClass $post
      * @param \stdClass $thread
      * @param \context $context
-     * @param int $direction
+     * @param string $emoji emoji shortcode
+     * @param string $action 'added' or 'removed'
      * @return self
      */
     public static function create_for_post(
         \stdClass $post,
         \stdClass $thread,
         \context $context,
-        int $direction
+        string $emoji,
+        string $action
     ): self {
         return self::create([
             'objectid' => $post->id,
             'context' => $context,
             'other' => [
                 'threadid' => (int)$thread->id,
-                'direction' => $direction,
+                'emoji' => $emoji,
+                'action' => $action,
             ],
         ]);
     }
