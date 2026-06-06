@@ -48,11 +48,11 @@ class provider implements core_userlist_provider, metadata_provider, plugin_prov
             'timemodified' => 'privacy:metadata:post:timemodified',
         ], 'privacy:metadata:post');
 
-        $collection->add_database_table('filter_embeddiscussion_vote', [
-            'userid' => 'privacy:metadata:vote:userid',
-            'vote' => 'privacy:metadata:vote:vote',
-            'timecreated' => 'privacy:metadata:vote:timecreated',
-        ], 'privacy:metadata:vote');
+        $collection->add_database_table('filter_embeddiscussion_reaction', [
+            'userid' => 'privacy:metadata:reaction:userid',
+            'emoji' => 'privacy:metadata:reaction:emoji',
+            'timecreated' => 'privacy:metadata:reaction:timecreated',
+        ], 'privacy:metadata:reaction');
 
         $collection->add_database_table('filter_embeddiscussion_handle', [
             'userid' => 'privacy:metadata:handle:userid',
@@ -80,8 +80,8 @@ class provider implements core_userlist_provider, metadata_provider, plugin_prov
         $sql = "SELECT t.contextid
                   FROM {filter_embeddiscussion_thread} t
                   JOIN {filter_embeddiscussion_post} p ON p.threadid = t.id
-                  JOIN {filter_embeddiscussion_vote} v ON v.postid = p.id
-                 WHERE v.userid = :userid";
+                  JOIN {filter_embeddiscussion_reaction} r ON r.postid = p.id
+                 WHERE r.userid = :userid";
         $contextlist->add_from_sql($sql, ['userid' => $userid]);
 
         $sql = "SELECT t.contextid
@@ -107,10 +107,10 @@ class provider implements core_userlist_provider, metadata_provider, plugin_prov
                  WHERE t.contextid = :contextid";
         $userlist->add_from_sql('userid', $sql, ['contextid' => $context->id]);
 
-        $sql = "SELECT v.userid
+        $sql = "SELECT r.userid
                   FROM {filter_embeddiscussion_thread} t
                   JOIN {filter_embeddiscussion_post} p ON p.threadid = t.id
-                  JOIN {filter_embeddiscussion_vote} v ON v.postid = p.id
+                  JOIN {filter_embeddiscussion_reaction} r ON r.postid = p.id
                  WHERE t.contextid = :contextid";
         $userlist->add_from_sql('userid', $sql, ['contextid' => $context->id]);
 
@@ -182,7 +182,7 @@ class provider implements core_userlist_provider, metadata_provider, plugin_prov
         $postids = $DB->get_fieldset_select('filter_embeddiscussion_post', 'id', "threadid $insql", $params);
         if ($postids) {
             [$insql2, $params2] = $DB->get_in_or_equal($postids, SQL_PARAMS_NAMED);
-            $DB->delete_records_select('filter_embeddiscussion_vote', "postid $insql2", $params2);
+            $DB->delete_records_select('filter_embeddiscussion_reaction', "postid $insql2", $params2);
         }
         $DB->delete_records_select('filter_embeddiscussion_handle', "threadid $insql", $params);
         $DB->delete_records_select('filter_embeddiscussion_post', "threadid $insql", $params);
@@ -216,8 +216,8 @@ class provider implements core_userlist_provider, metadata_provider, plugin_prov
                              SET content = '', deleted = 1
                            WHERE userid = :userid AND threadid $insql", $params);
 
-            // Remove votes.
-            $DB->execute("DELETE FROM {filter_embeddiscussion_vote}
+            // Remove reactions.
+            $DB->execute("DELETE FROM {filter_embeddiscussion_reaction}
                           WHERE userid = :userid AND postid IN (
                               SELECT id FROM {filter_embeddiscussion_post}
                               WHERE threadid $insql)", $params);
@@ -258,7 +258,7 @@ class provider implements core_userlist_provider, metadata_provider, plugin_prov
                          SET content = '', deleted = 1
                        WHERE userid $uinsql AND threadid $insql", $params);
 
-        $DB->execute("DELETE FROM {filter_embeddiscussion_vote}
+        $DB->execute("DELETE FROM {filter_embeddiscussion_reaction}
                       WHERE userid $uinsql AND postid IN (
                           SELECT id FROM {filter_embeddiscussion_post}
                           WHERE threadid $insql)", $params);

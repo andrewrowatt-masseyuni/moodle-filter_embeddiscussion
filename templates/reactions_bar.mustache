@@ -1,0 +1,89 @@
+{{!
+    This file is part of Moodle - http://moodle.org/
+
+    Moodle is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    Moodle is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+}}
+{{!
+    @template filter_embeddiscussion/reactions_bar
+
+    GitHub-style emoji reactions bar with trigger button and popup picker.
+    Ported from local_reactions/reactions_bar; the filter only renders the
+    compact view.
+
+    Classes required for JS:
+    * [data-region="reactions-bar"]
+    * [data-action="toggle-reaction"]
+    * [data-action="open-picker"]
+    * [data-region="reactions-picker"]
+    * [data-region="reaction-count"]
+
+    Example context (json):
+    {
+        "canreact": true,
+        "compactview": true,
+        "hasanycount": true,
+        "totalcount": 3,
+        "reactedEmojis": [
+            {"unicode": "👍"}
+        ],
+        "selected": true,
+        "buttons": [
+            {"shortcode": "thumbsup", "unicode": "👍", "count": 3, "hascount": true, "selected": true, "canreact": true},
+            {"shortcode": "heart", "unicode": "❤️", "count": 0, "hascount": false, "selected": false, "canreact": true}
+        ]
+    }
+}}
+<div class="embeddisc-reactions-bar d-flex flex-wrap" data-region="reactions-bar">
+    {{! Smiley trigger button to open the emoji picker }}
+    {{#canreact}}
+        <div class="embeddisc-reactions-picker-wrapper">
+            <button
+                type="button"
+                class="embeddisc-reactions-trigger"
+                data-action="open-picker"
+                aria-label="{{#str}} reacttothispost, filter_embeddiscussion {{/str}}"
+                aria-expanded="false"
+                title="{{#str}} reacttothispost, filter_embeddiscussion {{/str}}"
+            >
+                <svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0ZM1.5 8a6.5 6.5 0 1 0 13 0 6.5 6.5 0 0 0-13 0Zm3.82 1.636a.75.75 0 0 1 1.038.175l.007.009c.103.118.22.222.35.31.264.178.683.37 1.285.37.602 0 1.02-.192 1.285-.371.13-.088.247-.192.35-.31l.007-.008a.75.75 0 0 1 1.222.87l-.022.03c-.2.247-.46.47-.786.656-.652.374-1.404.583-2.056.583-.652 0-1.404-.21-2.056-.584a3.56 3.56 0 0 1-.786-.655l-.022-.031a.75.75 0 0 1 .184-1.043ZM6 6.5a1 1 0 1 1-2 0 1 1 0 0 1 2 0Zm6 0a1 1 0 1 1-2 0 1 1 0 0 1 2 0Z"/></svg>
+            </button>
+            <div class="embeddisc-reactions-picker" data-region="reactions-picker" role="menu" hidden>
+                {{#buttons}}
+                    <button
+                        type="button"
+                        class="embeddisc-reactions-picker-btn{{#selected}} embeddisc-reactions-selected{{/selected}}"
+                        data-action="toggle-reaction"
+                        data-emoji="{{shortcode}}"
+                        role="menuitem"
+                        aria-label="{{unicode}}"
+                    >
+                        <span aria-hidden="true">{{unicode}}</span>
+                    </button>
+                {{/buttons}}
+            </div>
+        </div>
+    {{/canreact}}
+
+    {{! Compact view: single pill with all reacted emojis and total count }}
+    {{#compactview}}
+        {{> filter_embeddiscussion/compact_pill }}
+    {{/compactview}}
+
+    {{! Normal view: individual reaction pills }}
+    {{^compactview}}
+        {{#buttons}}
+            {{> filter_embeddiscussion/pill }}
+        {{/buttons}}
+    {{/compactview}}
+</div>

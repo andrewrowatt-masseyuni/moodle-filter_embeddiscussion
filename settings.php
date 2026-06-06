@@ -66,4 +66,11 @@ if ($ADMIN->fulltree) {
         get_string('setting_animals_default', 'filter_embeddiscussion'),
         PARAM_TEXT
     ));
+
+    $settings->add(new admin_setting_configtextarea(
+        'filter_embeddiscussion/emojis',
+        get_string('setting_emojis', 'filter_embeddiscussion'),
+        get_string('setting_emojis_desc', 'filter_embeddiscussion'),
+        \filter_embeddiscussion\manager::DEFAULT_EMOJIS
+    ));
 }

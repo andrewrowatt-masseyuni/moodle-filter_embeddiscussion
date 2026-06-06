@@ -56,9 +56,9 @@ $functions = [
         'loginrequired' => true,
         'capabilities' => 'filter/embeddiscussion:deleteownpost,filter/embeddiscussion:deleteanypost',
     ],
-    'filter_embeddiscussion_vote_post' => [
-        'classname' => 'filter_embeddiscussion\external\vote_post',
-        'description' => 'Up- or down-vote a post.',
+    'filter_embeddiscussion_react_post' => [
+        'classname' => 'filter_embeddiscussion\external\react_post',
+        'description' => 'Toggle an emoji reaction on a post.',
         'type' => 'write',
         'ajax' => true,
         'loginrequired' => true,

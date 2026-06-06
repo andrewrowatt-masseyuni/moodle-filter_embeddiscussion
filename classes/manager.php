@@ -19,7 +19,7 @@ namespace filter_embeddiscussion;
 /**
  * Core data layer for filter_embeddiscussion.
  *
- * Owns thread initialisation, post CRUD, voting, and the per-user view
+ * Owns thread initialisation, post CRUD, emoji reactions, and the per-user view
  * representation that the JS consumes.
  *
  * @package    filter_embeddiscussion
@@ -27,22 +27,54 @@ namespace filter_embeddiscussion;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class manager {
+    /** @var string Default emoji set as comma-separated shortcode:unicode pairs. */
+    const DEFAULT_EMOJIS = 'thumbsup:👍,heart:❤️,laugh:😂,think:🤔,celebrate:🎉,surprise:😮,thanks:🙏';
+
+    /** @var array<string,string>|null Per-request cache of the parsed emoji set. */
+    private static ?array $emojisetcache = null;
+
+    /**
+     * Get the configured emoji set.
+     *
+     * @return array Associative array of shortcode => unicode emoji, in configured order.
+     */
+    public static function get_emoji_set(): array {
+        if (self::$emojisetcache !== null) {
+            return self::$emojisetcache;
+        }
+
+        $config = get_config('filter_embeddiscussion', 'emojis');
+        if (empty($config)) {
+            $config = self::DEFAULT_EMOJIS;
+        }
+
+        $emojis = [];
+        $pairs = explode(',', $config);
+        foreach ($pairs as $pair) {
+            $parts = explode(':', trim($pair), 2);
+            if (count($parts) === 2) {
+                $emojis[trim($parts[0])] = trim($parts[1]);
+            }
+        }
+        return self::$emojisetcache = $emojis;
+    }
+
     /**
      * Build the render context — batched user records, role assignments and
-     * vote counts — needed to render a list of posts. Returned as a plain array
-     * with the lifetime of the calling render: no class statics, no leakage
-     * across requests or tests, no possibility of a write path reading stale
-     * values from a render-populated cache.
+     * reaction counts — needed to render a list of posts. Returned as a plain
+     * array with the lifetime of the calling render: no class statics, no
+     * leakage across requests or tests, no possibility of a write path reading
+     * stale values from a render-populated cache.
      *
      * @param \stdClass[] $posts
      * @param \context $context
      * @param int $vieweruserid the user we are rendering for
-     * @return array{users:array<int,\stdClass>,roles:array<int,array>,votecounts:array<int,array{up:int,down:int}>,myvotes:array<int,int>}
+     * @return array{users:array<int,\stdClass>,roles:array<int,array>,reactions:array<int,array{counts:array<string,int>,userreactions:string[]}>}
      */
     protected static function build_render_context(array $posts, \context $context, int $vieweruserid): array {
         global $DB;
 
-        $ctx = ['users' => [], 'roles' => [], 'votecounts' => [], 'myvotes' => []];
+        $ctx = ['users' => [], 'roles' => [], 'reactions' => []];
         if (empty($posts)) {
             return $ctx;
         }
@@ -67,41 +99,140 @@ class manager {
             $ctx['roles'][$uid] = get_user_roles($context, $uid, true);
         }
 
-        // Vote totals — one GROUP BY query for up/down per post.
-        foreach ($postids as $pid) {
-            $ctx['votecounts'][$pid] = ['up' => 0, 'down' => 0];
-            $ctx['myvotes'][$pid] = 0;
-        }
-        [$insql, $params] = $DB->get_in_or_equal($postids, SQL_PARAMS_NAMED, 'p');
-        $rows = $DB->get_records_sql(
-            "SELECT postid, vote, COUNT(1) AS c
-               FROM {filter_embeddiscussion_vote}
-              WHERE postid $insql
-           GROUP BY postid, vote",
-            $params
-        );
-        foreach ($rows as $row) {
-            $pid = (int)$row->postid;
-            if ((int)$row->vote === 1) {
-                $ctx['votecounts'][$pid]['up'] = (int)$row->c;
-            } else if ((int)$row->vote === -1) {
-                $ctx['votecounts'][$pid]['down'] = (int)$row->c;
-            }
+        // Reaction counts plus the viewer's own reactions, batched across all posts.
+        $ctx['reactions'] = self::get_reactions($postids, $vieweruserid);
+
+        return $ctx;
+    }
+
+    /**
+     * Toggle a reaction. If the user already has this emoji on the post, remove it.
+     * Otherwise add it. When $allowmultiple is false, any existing reactions by this
+     * user on the same post are removed before adding the new one (single-reaction mode).
+     * When $allowmultiple is true (the default), users can have multiple different emoji
+     * reactions on the same post.
+     *
+     * @param int $postid Post ID.
+     * @param int $userid User ID.
+     * @param string $emoji Emoji shortcode.
+     * @param bool $allowmultiple When false, enforce single-reaction-per-post mode.
+     * @return array ['action' => 'added'|'removed', 'emoji' => string]
+     */
+    public static function toggle_reaction(
+        int $postid,
+        int $userid,
+        string $emoji,
+        bool $allowmultiple = true
+    ): array {
+        global $DB;
+
+        // Validate emoji is in the configured set.
+        $emojiset = self::get_emoji_set();
+        if (!isset($emojiset[$emoji])) {
+            throw new \invalid_parameter_exception('Invalid emoji: ' . $emoji);
         }
 
-        // The viewer's own vote per post.
-        $params['userid'] = $vieweruserid;
+        $existing = $DB->get_record('filter_embeddiscussion_reaction', [
+            'postid' => $postid,
+            'userid' => $userid,
+            'emoji' => $emoji,
+        ]);
+
+        if ($existing) {
+            // Already reacted with this emoji - remove it.
+            $DB->delete_records('filter_embeddiscussion_reaction', ['id' => $existing->id]);
+            return ['action' => 'removed', 'emoji' => $emoji];
+        }
+
+        // In single-reaction mode, wrap the delete-then-insert atomically so that
+        // concurrent requests from the same user cannot both slip through and add
+        // multiple reactions in a mode that is meant to allow only one.
+        $transaction = null;
+        if (!$allowmultiple) {
+            $transaction = $DB->start_delegated_transaction();
+            $DB->delete_records('filter_embeddiscussion_reaction', [
+                'postid' => $postid,
+                'userid' => $userid,
+            ]);
+        }
+        // Add the reaction. Two near-simultaneous requests for the same
+        // (post, user, emoji) can both reach this insert; the unique index will
+        // reject the loser with a dml_write_exception. Treat that as an idempotent
+        // success so a double-click does not surface as an error to the user.
+        $key = [
+            'postid' => $postid,
+            'userid' => $userid,
+            'emoji' => $emoji,
+        ];
+        $record = (object) ($key + ['timecreated' => time()]);
+        try {
+            $DB->insert_record('filter_embeddiscussion_reaction', $record);
+        } catch (\dml_write_exception $e) {
+            // Only swallow the "duplicate key" case; re-throw any other write failure
+            // so a real DB error doesn't get reported to the user as a successful add.
+            if (!$DB->record_exists('filter_embeddiscussion_reaction', $key)) {
+                throw $e;
+            }
+        }
+        if ($transaction) {
+            $DB->commit_delegated_transaction($transaction);
+        }
+        return ['action' => 'added', 'emoji' => $emoji];
+    }
+
+    /**
+     * Get reaction counts and the current user's reactions for multiple posts.
+     *
+     * @param int[] $postids Array of post IDs.
+     * @param int $userid Current user ID.
+     * @return array Keyed by postid, each containing 'counts' (emoji => total) and 'userreactions' (shortcodes).
+     */
+    public static function get_reactions(array $postids, int $userid): array {
+        global $DB;
+
+        $result = [];
+        foreach ($postids as $postid) {
+            $result[(int)$postid] = [
+                'counts' => [],
+                'userreactions' => [],
+            ];
+        }
+
+        if (empty($postids)) {
+            return $result;
+        }
+
+        // Counts per emoji per post.
+        [$insql, $params] = $DB->get_in_or_equal($postids, SQL_PARAMS_NAMED, 'p');
+
+        // Synthesise a unique first column so get_records_sql can key the result rows
+        // (postid alone is not unique when multiple emoji counts exist for one post).
+        // Use sql_concat() for cross-database portability (Oracle's CONCAT takes only 2 args).
+        $uid = $DB->sql_concat('postid', "'_'", 'emoji');
+        $sql = "SELECT $uid AS uid, postid, emoji, COUNT(1) AS total
+                  FROM {filter_embeddiscussion_reaction}
+                 WHERE postid $insql
+              GROUP BY postid, emoji
+              ORDER BY postid, total DESC";
+
+        $counts = $DB->get_records_sql($sql, $params);
+        foreach ($counts as $row) {
+            $result[(int)$row->postid]['counts'][$row->emoji] = (int) $row->total;
+        }
+
+        // The current user's reactions.
+        $params['userid'] = $userid;
         $myrows = $DB->get_records_sql(
-            "SELECT postid, vote
-               FROM {filter_embeddiscussion_vote}
+            "SELECT id, postid, emoji
+               FROM {filter_embeddiscussion_reaction}
               WHERE postid $insql AND userid = :userid",
             $params
         );
         foreach ($myrows as $row) {
-            $ctx['myvotes'][(int)$row->postid] = (int)$row->vote;
+            $result[(int)$row->postid]['userreactions'][] = $row->emoji;
         }
 
-        return $ctx;
+        return $result;
     }
 
     /**
@@ -124,7 +255,7 @@ class manager {
 
     /**
      * Delete every thread anchored to any of the given contexts, along with the
-     * posts, votes and anonymous handles that hang off them.
+     * posts, reactions and anonymous handles that hang off them.
      *
      * Used when Moodle deletes a context (course, module or block) so the
      * orphaned discussion data does not outlive the thing it was embedded in.
@@ -173,7 +304,7 @@ class manager {
 
         if ($posts) {
             [$insql, $params] = $DB->get_in_or_equal(array_keys($posts), SQL_PARAMS_NAMED, 'p');
-            $DB->delete_records_select('filter_embeddiscussion_vote', "postid $insql", $params);
+            $DB->delete_records_select('filter_embeddiscussion_reaction', "postid $insql", $params);
         }
         $DB->delete_records('filter_embeddiscussion_handle', ['threadid' => $thread->id]);
         $DB->delete_records('filter_embeddiscussion_post', ['threadid' => $thread->id]);
@@ -466,85 +597,6 @@ class manager {
     }
 
     /**
-     * Vote on a post. $direction is 1, -1, or 0 to clear.
-     *
-     * @param int $postid
-     * @param \stdClass $thread
-     * @param \context $context
-     * @param int $direction
-     * @param int $userid
-     * @return array [int up, int down, int my] my is -1/0/1
-     */
-    public static function vote_post(
-        int $postid,
-        \stdClass $thread,
-        \context $context,
-        int $direction,
-        int $userid
-    ): array {
-        global $DB;
-
-        require_capability('filter/embeddiscussion:createpost', $context);
-
-        $post = $DB->get_record('filter_embeddiscussion_post', ['id' => $postid], '*', MUST_EXIST);
-        if ((int)$post->threadid !== (int)$thread->id) {
-            throw new \invalid_parameter_exception('Post does not belong to this thread');
-        }
-        if ($post->deleted) {
-            throw new \moodle_exception('error_invalidthread', 'filter_embeddiscussion');
-        }
-
-        $direction = max(-1, min(1, $direction));
-
-        $existing = $DB->get_record('filter_embeddiscussion_vote', [
-            'postid' => $postid, 'userid' => $userid,
-        ]);
-
-        if ($direction === 0) {
-            if ($existing) {
-                $DB->delete_records('filter_embeddiscussion_vote', ['id' => $existing->id]);
-            }
-        } else if ($existing) {
-            if ((int)$existing->vote !== $direction) {
-                $existing->vote = $direction;
-                $existing->timecreated = time();
-                $DB->update_record('filter_embeddiscussion_vote', $existing);
-            }
-        } else {
-            $DB->insert_record('filter_embeddiscussion_vote', (object)[
-                'postid' => $postid,
-                'userid' => $userid,
-                'vote' => $direction,
-                'timecreated' => time(),
-            ]);
-        }
-
-        \filter_embeddiscussion\event\post_voted::create_for_post($post, $thread, $context, $direction)->trigger();
-
-        return self::vote_summary($postid, $userid);
-    }
-
-    /**
-     * Aggregate vote counts plus the named user's vote, read directly from the
-     * database. Render paths read prefetched counts via build_render_context;
-     * this helper is for the write path (vote_post) and for any caller that
-     * needs a fresh authoritative summary.
-     *
-     * @param int $postid
-     * @param int $userid
-     * @return array [int up, int down, int my]
-     */
-    public static function vote_summary(int $postid, int $userid): array {
-        global $DB;
-
-        $up = (int)$DB->count_records('filter_embeddiscussion_vote', ['postid' => $postid, 'vote' => 1]);
-        $down = (int)$DB->count_records('filter_embeddiscussion_vote', ['postid' => $postid, 'vote' => -1]);
-        $myrec = $DB->get_record('filter_embeddiscussion_vote', ['postid' => $postid, 'userid' => $userid]);
-        $my = $myrec ? (int)$myrec->vote : 0;
-        return ['up' => $up, 'down' => $down, 'my' => $my];
-    }
-
-    /**
      * Get a user's primary non-student role in this context (display label).
      *
      * @param \context $context
@@ -628,6 +680,12 @@ class manager {
                 $context
             );
 
+        // Ordered emoji set for the reactions picker; reacting reuses the post capability.
+        $emojis = [];
+        foreach (self::get_emoji_set() as $shortcode => $unicode) {
+            $emojis[] = ['shortcode' => $shortcode, 'unicode' => $unicode];
+        }
+
         return [
             'threadid' => (int)$thread->id,
             'name' => self::thread_display_name($thread),
@@ -635,6 +693,8 @@ class manager {
             'currentuserisanonymous' => $currentuserisanonymous,
             'canpost' => $canpost,
             'canmanageposts' => $canmanageposts,
+            'canreact' => $canpost,
+            'emojis' => $emojis,
             'postcount' => count($postsout),
             'posts' => $postsout,
             'currentuserid' => (int)$USER->id,
@@ -724,9 +784,11 @@ class manager {
         }
 
         $postid = (int)$post->id;
-        $up = (int)($renderctx['votecounts'][$postid]['up'] ?? 0);
-        $down = (int)($renderctx['votecounts'][$postid]['down'] ?? 0);
-        $my = (int)($renderctx['myvotes'][$postid] ?? 0);
+        $reactiondata = $renderctx['reactions'][$postid] ?? ['counts' => [], 'userreactions' => []];
+        $reactioncounts = [];
+        foreach ($reactiondata['counts'] as $emoji => $count) {
+            $reactioncounts[] = ['emoji' => $emoji, 'count' => (int)$count];
+        }
 
         $candelete = !$post->deleted && (
             ($isown && $candeleteown) || $candeleteany
@@ -753,9 +815,10 @@ class manager {
             'isanonymous' => $isanon,
             'profileurl' => $profileurl,
             'avatar' => $avatar,
-            'votes_up' => $up,
-            'votes_down' => $down,
-            'votes_my' => $my,
+            'reactions' => [
+                'counts' => $reactioncounts,
+                'userreactions' => array_values($reactiondata['userreactions']),
+            ],
             'canedit' => $canedit,
             'candelete' => $candelete,
             'canreply' => has_capability('filter/embeddiscussion:createpost', $context),
@@ -953,7 +1016,7 @@ class manager {
     /**
      * Convert the rich per-post view payload returned by build_post_view into
      * the lighter shape the dashboard expects: drops the interactive fields
-     * (votes, parentid, can-edit/delete/reply) and adds a posturl anchor.
+     * (reactions, parentid, can-edit/delete/reply) and adds a posturl anchor.
      *
      * @param array $view a row produced by self::build_post_view
      * @param \stdClass $thread thread record
@@ -969,9 +1032,7 @@ class manager {
     ): array {
         unset(
             $view['parentid'],
-            $view['votes_up'],
-            $view['votes_down'],
-            $view['votes_my'],
+            $view['reactions'],
             $view['canedit'],
             $view['candelete'],
             $view['canreply']

@@ -220,15 +220,14 @@ JS;
         }
     }
 
+    // phpcs:disable moodle.Files.LineLength.TooLong
     /**
-     * Click a vote button on the post containing the given snippet.
+     * Open the emoji reactions picker on the post containing the given snippet.
      *
-     * @When /^I click the "(?P<dir>up|down)" vote button on the embedded discussion post containing "(?P<needle>[^"]*)"$/
-     * @param string $dir up or down
+     * @When /^I open the reactions picker on the embedded discussion post containing "(?P<needle>[^"]*)"$/
      * @param string $needle post content substring
      */
-    public function i_click_vote_button(string $dir, string $needle): void {
-        $direction = $dir === 'up' ? 1 : -1;
+    public function i_open_reactions_picker(string $needle): void {
         $needlejs = json_encode($needle);
         $script = <<<JS
             (function() {
@@ -236,7 +235,43 @@ JS;
                 for (var i = 0; i < posts.length; i++) {
                     var content = posts[i].querySelector('[data-region="post-content"]');
                     if (content && content.textContent.indexOf($needlejs) !== -1) {
-                        var btn = posts[i].querySelector('[data-action="vote"][data-direction="$direction"]');
+                        var trigger = posts[i].querySelector('[data-region="post-actions"] [data-action="open-picker"]');
+                        if (trigger) {
+                            trigger.click();
+                            return 'clicked';
+                        }
+                        return 'no-button';
+                    }
+                }
+                return 'no-post';
+            })();
+JS;
+        $result = $this->evaluate_script($script);
+        if ($result !== 'clicked') {
+            throw new ExpectationException(
+                "Could not open the reactions picker on a post containing '$needle' ($result)",
+                $this->getSession()
+            );
+        }
+        $this->wait_for_pending_js();
+    }
+
+    /**
+     * React with (or remove) a given emoji on the post containing the given snippet.
+     *
+     * @When /^I react with the "(?P<emoji>[a-z0-9]+)" emoji on the embedded discussion post containing "(?P<needle>[^"]*)"$/
+     * @param string $emoji emoji shortcode
+     * @param string $needle post content substring
+     */
+    public function i_react_with_emoji(string $emoji, string $needle): void {
+        $needlejs = json_encode($needle);
+        $script = <<<JS
+            (function() {
+                var posts = document.querySelectorAll('[data-region="post"]');
+                for (var i = 0; i < posts.length; i++) {
+                    var content = posts[i].querySelector('[data-region="post-content"]');
+                    if (content && content.textContent.indexOf($needlejs) !== -1) {
+                        var btn = posts[i].querySelector('[data-region="post-actions"] [data-action="toggle-reaction"][data-emoji="$emoji"]');
                         if (btn) {
                             btn.click();
                             return 'clicked';
@@ -250,24 +285,22 @@ JS;
         $result = $this->evaluate_script($script);
         if ($result !== 'clicked') {
             throw new ExpectationException(
-                "Could not click $dir vote on a post containing '$needle' ($result)",
+                "Could not react with '$emoji' on a post containing '$needle' ($result)",
                 $this->getSession()
             );
         }
         $this->wait_for_pending_js();
     }
 
-    // phpcs:disable moodle.Files.LineLength.TooLong
     /**
-     * Assert the up/down vote count for a post.
+     * Assert the total reaction count shown on the compact pill for a post.
+     * A post with no reactions has no count region and is treated as "0".
      *
-     * @Then /^the "(?P<dir>up|down)" vote count on the embedded discussion post containing "(?P<needle>[^"]*)" should be "(?P<count>\d+)"$/
-     * @param string $dir up or down
+     * @Then /^the reaction count on the embedded discussion post containing "(?P<needle>[^"]*)" should be "(?P<count>\d+)"$/
      * @param string $needle post content substring
-     * @param string $count expected vote count
+     * @param string $count expected total reaction count
      */
-    public function vote_count_should_be(string $dir, string $needle, string $count): void {
-        $region = $dir === 'up' ? 'votes-up' : 'votes-down';
+    public function reaction_count_should_be(string $needle, string $count): void {
         $needlejs = json_encode($needle);
         $script = <<<JS
             (function() {
@@ -275,8 +308,8 @@ JS;
                 for (var i = 0; i < posts.length; i++) {
                     var content = posts[i].querySelector('[data-region="post-content"]');
                     if (content && content.textContent.indexOf($needlejs) !== -1) {
-                        var span = posts[i].querySelector('[data-region="$region"]');
-                        return span ? span.textContent.trim() : 'no-region';
+                        var span = posts[i].querySelector('[data-region="post-actions"] [data-region="reaction-count"]');
+                        return span ? span.textContent.trim() : '0';
                     }
                 }
                 return 'no-post';
@@ -285,22 +318,21 @@ JS;
         $result = (string)$this->evaluate_script($script);
         if ($result !== $count) {
             throw new ExpectationException(
-                "Expected $dir vote count to be '$count' on post containing '$needle', got '$result'",
+                "Expected reaction count to be '$count' on post containing '$needle', got '$result'",
                 $this->getSession()
             );
         }
     }
 
     /**
-     * Check whether the up/down vote button is in the active state for the matching post.
+     * Check whether a given emoji is marked as the viewer's own reaction on the matching post.
      *
-     * @Then /^the "(?P<dir>up|down)" vote on the embedded discussion post containing "(?P<needle>[^"]*)" should (?P<should>be|not be) marked as active$/
-     * @param string $dir up or down
+     * @Then /^the "(?P<emoji>[a-z0-9]+)" reaction on the embedded discussion post containing "(?P<needle>[^"]*)" should (?P<should>be|not be) marked as mine$/
+     * @param string $emoji emoji shortcode
      * @param string $needle post content substring
      * @param string $should "be" or "not be"
      */
-    public function vote_active_state(string $dir, string $needle, string $should): void {
-        $direction = $dir === 'up' ? 1 : -1;
+    public function reaction_mine_state(string $emoji, string $needle, string $should): void {
         $expected = ($should === 'be');
         $needlejs = json_encode($needle);
         $script = <<<JS
@@ -309,18 +341,18 @@ JS;
                 for (var i = 0; i < posts.length; i++) {
                     var content = posts[i].querySelector('[data-region="post-content"]');
                     if (content && content.textContent.indexOf($needlejs) !== -1) {
-                        var btn = posts[i].querySelector('[data-action="vote"][data-direction="$direction"]');
-                        return btn && btn.classList.contains('active') ? 'active' : 'inactive';
+                        var btn = posts[i].querySelector('[data-region="post-actions"] [data-action="toggle-reaction"][data-emoji="$emoji"]');
+                        return btn && btn.classList.contains('embeddisc-reactions-selected') ? 'mine' : 'notmine';
                     }
                 }
                 return 'no-post';
             })();
 JS;
         $state = (string)$this->evaluate_script($script);
-        $isactive = ($state === 'active');
-        if ($isactive !== $expected) {
+        $ismine = ($state === 'mine');
+        if ($ismine !== $expected) {
             throw new ExpectationException(
-                "Expected $dir vote on post '$needle' to be '" . ($expected ? 'active' : 'inactive') . "', got '$state'",
+                "Expected '$emoji' reaction on post '$needle' to be '" . ($expected ? 'mine' : 'not mine') . "', got '$state'",
                 $this->getSession()
             );
         }

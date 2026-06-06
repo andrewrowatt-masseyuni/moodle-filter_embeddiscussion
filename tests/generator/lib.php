@@ -24,7 +24,7 @@
  */
 
 /**
- * Seeds threads, posts and votes for filter_embeddiscussion tests.
+ * Seeds threads, posts and reactions for filter_embeddiscussion tests.
  */
 class filter_embeddiscussion_generator extends component_generator_base {
     /**
@@ -114,51 +114,38 @@ class filter_embeddiscussion_generator extends component_generator_base {
     }
 
     /**
-     * Cast a vote on a post.
+     * Add an emoji reaction to a post.
      *
      * Required: thread (idnumber), userid, postauthor (username) or postcontent
-     * (substring match), direction (1 or -1).
+     * (substring match), emoji (shortcode). Adding the same emoji twice is a no-op.
      *
      * @param array|stdClass $record
      * @return void
      */
-    public function create_vote($record): void {
+    public function create_reaction($record): void {
         global $DB;
 
         $record = (array)$record;
-        foreach (['thread', 'userid', 'direction'] as $req) {
+        foreach (['thread', 'userid', 'emoji'] as $req) {
             if (!isset($record[$req])) {
-                throw new coding_exception("filter_embeddiscussion vote requires '$req'");
+                throw new coding_exception("filter_embeddiscussion reaction requires '$req'");
             }
         }
 
         $threadrecord = $this->find_thread((string)$record['thread'], $record['courseid'] ?? null);
-        $direction = (int)$record['direction'];
-        if ($direction !== 1 && $direction !== -1) {
-            throw new coding_exception('Vote direction must be 1 or -1');
-        }
-
+        $emoji = (string)$record['emoji'];
         $postid = $this->find_post_id($threadrecord->id, $record);
 
-        if (
-            $DB->record_exists('filter_embeddiscussion_vote', [
+        $key = [
             'postid' => $postid,
-            'userid' => $record['userid'],
-            ])
-        ) {
-            $DB->set_field('filter_embeddiscussion_vote', 'vote', $direction, [
-                'postid' => $postid,
-                'userid' => $record['userid'],
-            ]);
+            'userid' => (int)$record['userid'],
+            'emoji' => $emoji,
+        ];
+        if ($DB->record_exists('filter_embeddiscussion_reaction', $key)) {
             return;
         }
 
-        $DB->insert_record('filter_embeddiscussion_vote', (object)[
-            'postid' => $postid,
-            'userid' => (int)$record['userid'],
-            'vote' => $direction,
-            'timecreated' => time(),
-        ]);
+        $DB->insert_record('filter_embeddiscussion_reaction', (object)($key + ['timecreated' => time()]));
     }
 
     /**
@@ -251,7 +238,7 @@ class filter_embeddiscussion_generator extends component_generator_base {
             return (int)$record['postid'];
         }
         if (empty($record['postcontent'])) {
-            throw new coding_exception('Vote requires postid or postcontent');
+            throw new coding_exception('Reaction requires postid or postcontent');
         }
         $like = $DB->sql_like('content', ':needle');
         $sql = "SELECT id FROM {filter_embeddiscussion_post}

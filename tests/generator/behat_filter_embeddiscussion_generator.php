@@ -48,10 +48,10 @@ class behat_filter_embeddiscussion_generator extends behat_generator_base {
                 'required' => ['thread', 'user', 'content'],
                 'switchids' => ['user' => 'userid'],
             ],
-            'votes' => [
-                'singular' => 'vote',
-                'datagenerator' => 'vote',
-                'required' => ['thread', 'user', 'postcontent', 'direction'],
+            'reactions' => [
+                'singular' => 'reaction',
+                'datagenerator' => 'reaction',
+                'required' => ['thread', 'user', 'postcontent', 'emoji'],
                 'switchids' => ['user' => 'userid'],
             ],
         ];
