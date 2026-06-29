@@ -55,10 +55,10 @@ Feature: Testing mod_book in filter_embeddiscussion
     And the embedded discussion is loaded
     Then I should not see "c2-discussion"
 
-    # Pinning the chapter to an explicit thread name matching the title it had
-    # when the comment was posted ("b1: c2") re-attaches the detached discussion.
+    # Pinning the chapter to an explicit thread name matching the name it had
+    # when the comment was posted ("b1 \ c2") re-attaches the detached discussion.
     When I follow "Edit chapter \"2. c3\""
-    And I set the field "Content" to "{discussion:b1: c2 | Acceptance test site}"
+    And I set the field "Content" to "{discussion:b1 \ c2}"
     And I press "Save changes"
     And the embedded discussion is loaded
     Then I should see "c2-discussion"

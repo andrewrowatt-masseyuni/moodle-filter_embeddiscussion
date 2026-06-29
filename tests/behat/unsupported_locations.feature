@@ -1,8 +1,8 @@
 @filter @filter_embeddiscussion @unsupported_locations
-Feature: Nameless tokens outside Book embed discussions
-  In order to discuss course content from common Moodle locations
+Feature: Nameless tokens outside Book require an explicit thread name
+  In order to avoid silently creating badly named discussions
   As a course participant
-  I should see embedded discussions for nameless tokens outside Book chapters
+  I should be told a thread name is required when a nameless token is used outside a Book chapter
 
   Background:
     Given the following "courses" exist:
@@ -19,73 +19,59 @@ Feature: Nameless tokens outside Book embed discussions
     And the "embeddiscussion" filter is "on"
 
   @javascript
-  Scenario: Teacher sees a discussion for nameless tokens in a label
+  Scenario: Staff sees a thread-name-required message for a nameless token in a label
     Given the following "activities" exist:
       | activity | course | name               | intro                                                          | idnumber |
       | label    | C1     | Unsupported label  | Before {discussion} after                                      | label1   |
     When I log in as "teacher1"
     And I am on "Course 1" course homepage
-    Then the embedded discussion is loaded
+    Then I should see "A thread name is required"
     And I should not see "{discussion}"
-    And "[data-region='filter-embeddiscussion']" "css_element" should exist
-    And I should not see "Discussions cannot be embedded here. Only Book chapters are currently supported"
+    And "[data-region='filter-embeddiscussion'][data-threadid]" "css_element" should not exist
 
   @javascript
-  Scenario: Student sees a discussion for nameless tokens in a label
+  Scenario: Student sees the uninitialised notice for a nameless token in a label
     Given the following "activities" exist:
       | activity | course | name               | intro                                                          | idnumber |
       | label    | C1     | Unsupported label  | Before {discussion} after                                      | label1   |
-    # An editor visit initialises the thread (filter/embeddiscussion:createthread).
-    And I log in as "teacher1"
-    And I am on "Course 1" course homepage
-    And the embedded discussion is loaded
-    And I log out
     When I log in as "student1"
     And I am on "Course 1" course homepage
-    Then the embedded discussion is loaded
+    Then I should see "advise your teaching team"
     And I should not see "{discussion}"
-    And "[data-region='filter-embeddiscussion']" "css_element" should exist
-    And I should not see "Discussions cannot be embedded here. Only Book chapters are currently supported"
+    And "[data-region='filter-embeddiscussion'][data-threadid]" "css_element" should not exist
 
   @javascript
-  Scenario: Teacher sees a discussion for nameless tokens in a page body
+  Scenario: Staff sees a thread-name-required message for a nameless token in a page body
     Given the following "activities" exist:
       | activity | course | name              | intro      | content                                                      | idnumber |
       | page     | C1     | Unsupported page  | Page desc  | Before {discussion} after                                    | page1    |
     When I am on the "Unsupported page" "page activity" page logged in as "teacher1"
-    Then the embedded discussion is loaded
+    Then I should see "A thread name is required"
     And I should not see "{discussion}"
-    And "[data-region='filter-embeddiscussion']" "css_element" should exist
-    And I should not see "Discussions cannot be embedded here. Only Book chapters are currently supported"
+    And "[data-region='filter-embeddiscussion'][data-threadid]" "css_element" should not exist
 
   @javascript
-  Scenario: Student sees a discussion for nameless tokens in a page body
+  Scenario: Student sees the uninitialised notice for a nameless token in a page body
     Given the following "activities" exist:
       | activity | course | name              | intro      | content                                                      | idnumber |
       | page     | C1     | Unsupported page  | Page desc  | Before {discussion} after                                    | page1    |
-    # An editor visit initialises the thread (filter/embeddiscussion:createthread).
-    And I am on the "Unsupported page" "page activity" page logged in as "teacher1"
-    And the embedded discussion is loaded
-    And I log out
     When I am on the "Unsupported page" "page activity" page logged in as "student1"
-    Then the embedded discussion is loaded
+    Then I should see "advise your teaching team"
     And I should not see "{discussion}"
-    And "[data-region='filter-embeddiscussion']" "css_element" should exist
-    And I should not see "Discussions cannot be embedded here. Only Book chapters are currently supported"
+    And "[data-region='filter-embeddiscussion'][data-threadid]" "css_element" should not exist
 
   @javascript
-  Scenario: Teacher sees a discussion for nameless tokens in a section summary
+  Scenario: Staff sees a thread-name-required message for a nameless token in a section summary
     Given I log in as "teacher1"
     And I am on "Course 1" course homepage with editing mode on
     When I edit the section "1" and I fill the form with:
       | Description | Before {discussion} after                     |
-    Then the embedded discussion is loaded
+    Then I should see "A thread name is required"
     And I should not see "{discussion}"
-    And "[data-region='filter-embeddiscussion']" "css_element" should exist
-    And I should not see "Discussions cannot be embedded here. Only Book chapters are currently supported"
+    And "[data-region='filter-embeddiscussion'][data-threadid]" "css_element" should not exist
 
   @javascript
-  Scenario: Student sees a discussion for nameless tokens in a section summary
+  Scenario: Student sees the uninitialised notice for a nameless token in a section summary
     Given I log in as "teacher1"
     And I am on "Course 1" course homepage with editing mode on
     And I edit the section "1" and I fill the form with:
@@ -93,7 +79,6 @@ Feature: Nameless tokens outside Book embed discussions
     When I log out
     And I log in as "student1"
     And I am on "Course 1" course homepage
-    Then the embedded discussion is loaded
+    Then I should see "advise your teaching team"
     And I should not see "{discussion}"
-    And "[data-region='filter-embeddiscussion']" "css_element" should exist
-    And I should not see "Discussions cannot be embedded here. Only Book chapters are currently supported"
+    And "[data-region='filter-embeddiscussion'][data-threadid]" "css_element" should not exist

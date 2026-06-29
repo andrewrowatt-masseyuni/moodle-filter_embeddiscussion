@@ -134,7 +134,7 @@ class helper {
     public static function thread_structure(): external_single_structure {
         return new external_single_structure([
             'threadid' => new external_value(PARAM_INT, 'Thread id'),
-            'name' => new external_value(PARAM_TEXT, 'Thread idnumber'),
+            'name' => new external_value(PARAM_TEXT, 'Thread name'),
             'anonymous' => new external_value(PARAM_BOOL, 'Anonymous mode enabled'),
             'currentuserisanonymous' => new external_value(
                 PARAM_BOOL,

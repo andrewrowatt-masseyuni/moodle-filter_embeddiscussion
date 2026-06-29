@@ -1,0 +1,12 @@
+{{!
+    @template filter_embeddiscussion/threadnamerequired
+
+    Shown in place of an embedded discussion when a token omits the thread name
+    outside a Book chapter (where a name is required) and the current user can
+    fix the content (moodle/course:manageactivities).
+
+    Example context (json): {}
+}}
+<div class="alert alert-warning" data-region="filter-embeddiscussion-namerequired">
+    {{#str}}threadnamerequired, filter_embeddiscussion{{/str}}
+</div>

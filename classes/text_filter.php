@@ -25,7 +25,8 @@ namespace filter_embeddiscussion;
  * with a skeleton container that the JS module populates asynchronously.
  *
  * In Book chapter pages, the thread name is optional and defaults to the
- * current page name derived from $PAGE->title.
+ * book and chapter name ("<book> \ <chapter>"). Everywhere else a thread name
+ * is required: a nameless token renders a notice instead of a discussion.
  *
  * Legacy syntaxes can also be recognised and rewritten to the canonical token
  * before processing when enabled via site settings:
@@ -81,7 +82,10 @@ class text_filter extends \core_filters\text_filter {
         $dashboardused = false;
         $self = $this;
 
-        $text = preg_replace_callback(self::PATTERN, function ($matches) use ($self, $OUTPUT, &$dashboardused) {
+        // Resolve the Book chapter id once per page; 0 outside a Book chapter.
+        $itemid = $this->derive_book_chapter_itemid();
+
+        $text = preg_replace_callback(self::PATTERN, function ($matches) use ($self, $OUTPUT, $itemid, &$dashboardused) {
             if (strcasecmp($matches[0], '{discussiondashboard}') === 0) {
                 $rendered = $self->render_dashboard_placeholder($OUTPUT);
                 if ($rendered !== null) {
@@ -95,7 +99,7 @@ class text_filter extends \core_filters\text_filter {
             $threadname = self::sanitise_thread_name($matches[2] ?? '');
             $anonymous = ($tokentype === 'anondiscussion' || $tokentype === 'anonymousdiscussion');
 
-            $rendered = $self->render_thread_placeholder($threadname, $anonymous, $OUTPUT);
+            $rendered = $self->render_thread_placeholder($threadname, $anonymous, $itemid, $OUTPUT);
             return $rendered ?? $matches[0];
         }, $text);
 
@@ -196,12 +200,14 @@ class text_filter extends \core_filters\text_filter {
      /**
       * Render a discussion placeholder.
       *
-      * In Book chapter pages, an omitted thread name falls back to $PAGE->title.
-      * In all other contexts, an omitted thread name falls back to
-      * "context-<contextid>".
+      * In Book chapter pages, an omitted thread name falls back to the book and
+      * chapter name ("<book> \ <chapter>"). In all other contexts a thread name
+      * is required: an omitted name renders a notice (see
+      * {@see render_thread_name_required()}) rather than a discussion.
       *
       * @param string $name explicit thread name from the token body
       * @param bool $anonymous whether anonymous mode should be applied
+      * @param int $itemid Book chapter id when embedded in a Book chapter, else 0
       * @param object $output the page output renderer
       * @return string|null rendered HTML, empty string to remove token, or null
       *                     to keep the original token text
@@ -209,20 +215,22 @@ class text_filter extends \core_filters\text_filter {
     protected function render_thread_placeholder(
         string $name,
         bool $anonymous,
+        int $itemid,
         $output
     ): ?string {
         $threadname = self::sanitise_thread_name($name);
         if ($threadname === '') {
-            $threadname = self::sanitise_thread_name($this->derive_default_thread_name());
+            $threadname = self::sanitise_thread_name($this->derive_default_thread_name($itemid));
             if ($threadname === '') {
-                return null;
+                // A thread name is mandatory outside a Book chapter.
+                return $this->render_thread_name_required($output);
             }
         }
 
         // Resolve the thread server-side so the browser only learns the thread id.
         // Anonymous mode is token-authored and never trusted from the client.
         try {
-            $thread = manager::get_or_create_thread($threadname, $this->context, $threadname);
+            $thread = manager::get_or_create_thread($threadname, $this->context, $threadname, $itemid);
             $thread = manager::sync_settings_from_token($thread, [
                 'anonymous' => $anonymous,
             ]);
@@ -242,23 +250,82 @@ class text_filter extends \core_filters\text_filter {
     }
 
     /**
+     * Render the notice shown when a token omits the thread name outside a Book
+     * chapter, where a name is required.
+     *
+     * Staff who can fix the content (moodle/course:manageactivities) are told a
+     * thread name is required; everyone else sees the generic student-friendly
+     * "uninitialised" notice.
+     *
+     * @param object $output the page output renderer
+     * @return string rendered HTML
+     */
+    protected function render_thread_name_required($output): string {
+        $template = has_capability('moodle/course:manageactivities', $this->context)
+            ? 'filter_embeddiscussion/threadnamerequired'
+            : 'filter_embeddiscussion/threaduninitialised';
+        return $output->render_from_template($template, []);
+    }
+
+    /**
      * Derive the fallback thread name when the token omits an explicit name.
      *
-     * In Book contexts this uses $PAGE->title. In all other contexts this uses
-     * a stable context-scoped key "context-<contextid>".
+     * In Book chapters this is the language string "<book> \ <chapter>" built
+     * from the activity name and the current chapter title. In all other
+     * contexts, and when the chapter cannot be resolved, this returns an empty
+     * string to signal that an explicit thread name is required.
      *
-     * @return string
+     * @param int $itemid Book chapter id when embedded in a Book chapter, else 0
+     * @return string the derived name, or '' when no default is available
      */
-    protected function derive_default_thread_name(): string {
-        global $PAGE;
+    protected function derive_default_thread_name(int $itemid = 0): string {
+        global $DB;
 
         [, , $cm] = get_context_info_array($this->context->id);
 
-        if (($cm->modname ?? '') === 'book' && $PAGE->url->get_path() === '/mod/book/view.php' && ($PAGE->title ?? '') !== '') {
-            return $PAGE->title;
+        if (($cm->modname ?? '') === 'book' && $itemid > 0) {
+            $chaptertitle = (string)$DB->get_field('book_chapters', 'title', ['id' => $itemid]);
+            if ($chaptertitle !== '') {
+                return get_string('bookchapterthreadname', 'filter_embeddiscussion', (object)[
+                    'book' => (string)($cm->name ?? ''),
+                    'chapter' => $chaptertitle,
+                ]);
+            }
         }
 
-        return 'context-' . (int)$this->context->id;
+        return '';
+    }
+
+    /**
+     * Resolve the Book chapter id for the filtered content.
+     *
+     * Returns 0 unless the filter context belongs to a Book module. On a Book
+     * page the chapter id comes from the chapterid request parameter; when that
+     * is absent (the book opened on its default page) it falls back to the id of
+     * the book's first chapter.
+     *
+     * @return int the chapter id, or 0 when not embedded in a Book chapter
+     */
+    protected function derive_book_chapter_itemid(): int {
+        global $DB;
+
+        [, , $cm] = get_context_info_array($this->context->id);
+        if (($cm->modname ?? '') !== 'book') {
+            return 0;
+        }
+
+        $chapterid = optional_param('chapterid', 0, PARAM_INT);
+        if ($chapterid > 0) {
+            return $chapterid;
+        }
+
+        $bookid = (int)($cm->instance ?? 0);
+        if ($bookid <= 0) {
+            return 0;
+        }
+
+        $firstchapter = $DB->get_records('book_chapters', ['bookid' => $bookid], 'pagenum ASC', 'id', 0, 1);
+        return $firstchapter ? (int)reset($firstchapter)->id : 0;
     }
 
     /**

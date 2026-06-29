@@ -52,7 +52,7 @@ class threads extends system_report {
             $this->add_base_condition_sql("{$alias}.courseid = :{$param}", [$param => $courseid]);
         }
 
-        $this->add_base_fields("{$alias}.id, {$alias}.idnumber, {$alias}.contextid, {$alias}.courseid");
+        $this->add_base_fields("{$alias}.id, {$alias}.contextid, {$alias}.courseid");
 
         $this->add_columns();
         $this->add_filters();

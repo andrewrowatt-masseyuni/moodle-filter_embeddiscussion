@@ -32,7 +32,7 @@ class filter_embeddiscussion_generator extends component_generator_base {
      *
      * Required: idnumber (or legacy name). Optional: threadname, courseid
      * (course context), activity (idnumber or activity name to anchor at
-     * module context), anonymous.
+     * module context), anonymous, itemid (Book chapter id).
      *
      * @param array|stdClass $record
      * @return stdClass
@@ -47,12 +47,14 @@ class filter_embeddiscussion_generator extends component_generator_base {
         }
 
         $threadname = trim((string)($record['threadname'] ?? ($record['name'] ?? '')));
+        $itemid = (int)($record['itemid'] ?? 0);
 
         $context = $this->resolve_context($record);
         $thread = \filter_embeddiscussion\manager::get_or_create_thread(
             $idnumber,
             $context,
-            ($threadname !== '') ? $threadname : null
+            ($threadname !== '') ? $threadname : null,
+            $itemid
         );
 
         $update = [];

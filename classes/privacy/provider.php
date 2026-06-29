@@ -151,7 +151,7 @@ class provider implements core_userlist_provider, metadata_provider, plugin_prov
 
                 $threadtitle = trim((string)($thread->threadname ?? ''));
                 if ($threadtitle === '') {
-                    $threadtitle = (string)($thread->idnumber ?? '');
+                    $threadtitle = 'thread-' . $thread->id;
                 }
 
                 writer::with_context($context)->export_data(

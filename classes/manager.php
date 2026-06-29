@@ -319,16 +319,19 @@ class manager {
     /**
      * Get or create the thread for an idnumber+context. Creation is logged.
      *
-     * @param string $idnumber
+     * @param string $idnumber the thread lookup string (hashed into namehash)
      * @param \context $context
      * @param string|null $threadname thread name at token-processing time; refreshed
      *                                on each call when available.
+     * @param int $itemid Book chapter id when embedded in a Book chapter, else 0.
+     *                    Recorded on creation only.
      * @return \stdClass
      */
     public static function get_or_create_thread(
         string $idnumber,
         \context $context,
-        ?string $threadname = null
+        ?string $threadname = null,
+        int $itemid = 0
     ): \stdClass {
         global $DB;
 
@@ -370,11 +373,11 @@ class manager {
         $masterlistsize = max(count(handles::master_list()), 1);
 
         $record = (object)[
-            'idnumber' => $idnumber,
             'threadname' => ($threadname !== '') ? $threadname : $idnumber,
             'namehash' => sha1($idnumber),
             'contextid' => $context->id,
             'courseid' => $courseid,
+            'itemid' => $itemid,
             'anonymous' => 0,
             'handleoffset' => random_int(0, $masterlistsize - 1),
             'timecreated' => $now,
@@ -876,7 +879,7 @@ class manager {
             'filter_embeddiscussion_thread',
             "contextid $insql",
             $inparams,
-            'threadname ASC, idnumber ASC'
+            'threadname ASC, id ASC'
         );
 
         $threadsout = [];
@@ -964,9 +967,6 @@ class manager {
      */
     protected static function thread_display_name(\stdClass $thread): string {
         $name = trim((string)($thread->threadname ?? ''));
-        if ($name === '') {
-            $name = trim((string)($thread->idnumber ?? ''));
-        }
         if ($name === '') {
             return '';
         }

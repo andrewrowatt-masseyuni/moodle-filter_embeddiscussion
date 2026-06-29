@@ -62,7 +62,7 @@ class thread_initialised extends \core\event\base {
         return self::create([
             'objectid' => $thread->id,
             'context' => $context,
-            'other' => ['idnumber' => $thread->idnumber],
+            'other' => ['threadname' => $thread->threadname, 'itemid' => (int)$thread->itemid],
         ]);
     }
 }

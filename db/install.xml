@@ -1,17 +1,17 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<XMLDB PATH="filter/embeddiscussion/db" VERSION="2026060600" COMMENT="filter_embeddiscussion database tables"
+<XMLDB PATH="filter/embeddiscussion/db" VERSION="2026062900" COMMENT="filter_embeddiscussion database tables"
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
     xsi:noNamespaceSchemaLocation="../../../lib/xmldb/xmldb.xsd"
 >
   <TABLES>
-    <TABLE NAME="filter_embeddiscussion_thread" COMMENT="Embedded discussion threads, one per unique idnumber+context.">
+    <TABLE NAME="filter_embeddiscussion_thread" COMMENT="Embedded discussion threads, one per unique namehash+context.">
       <FIELDS>
         <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
-        <FIELD NAME="idnumber" TYPE="char" LENGTH="255" NOTNULL="true" COMMENT="Thread idnumber from filter token"/>
         <FIELD NAME="threadname" TYPE="char" LENGTH="255" NOTNULL="false" COMMENT="Thread name captured when the token was processed"/>
-        <FIELD NAME="namehash" TYPE="char" LENGTH="40" NOTNULL="true" COMMENT="SHA1 of idnumber for unique index"/>
+        <FIELD NAME="namehash" TYPE="char" LENGTH="40" NOTNULL="true" COMMENT="SHA1 of the thread lookup string for unique index"/>
         <FIELD NAME="contextid" TYPE="int" LENGTH="10" NOTNULL="true" COMMENT="Context where the thread was first initialised"/>
         <FIELD NAME="courseid" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" COMMENT="Course where the thread lives (0 if site)"/>
+        <FIELD NAME="itemid" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" COMMENT="Book chapter id when embedded in a Book chapter, else 0"/>
         <FIELD NAME="anonymous" TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="0" COMMENT="1 = anonymous handles for students"/>
         <FIELD NAME="handleoffset" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" COMMENT="Random offset into the handle master list"/>
         <FIELD NAME="timecreated" TYPE="int" LENGTH="10" NOTNULL="true"/>

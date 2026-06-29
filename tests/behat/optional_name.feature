@@ -1,5 +1,5 @@
 @filter @filter_embeddiscussion
-Feature: Discussion tokens with no thread name default to the page name in Book chapters
+Feature: Discussion tokens with no thread name default to the book and chapter name in Book chapters
   In order to keep tokens short in Book chapters where the chapter title is a sensible thread name
   As a teacher
   I should be able to omit the thread name in Book chapters and still render a discussion
@@ -19,7 +19,7 @@ Feature: Discussion tokens with no thread name default to the page name in Book 
     And the "embeddiscussion" filter is "on"
 
   @javascript
-  Scenario: {discussion} renders a placeholder using the page name
+  Scenario: {discussion} renders a placeholder using the book and chapter name
     Given the following "activities" exist:
       | activity | course | name      | idnumber |
       | book     | C1     | Discuss A | book1    |
