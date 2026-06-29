@@ -36,6 +36,22 @@ final class manager_test extends \advanced_testcase {
         return (string)($thread->threadname ?? '');
     }
 
+    /**
+     * Prohibit filter/embeddiscussion:createthread for the student role in a context.
+     *
+     * Students are granted this capability by default (for rollover scenarios), so a
+     * test that needs to exercise the "user lacks createthread" path must remove it
+     * explicitly rather than relying on the archetype default.
+     *
+     * @param \context $context
+     */
+    protected function prohibit_createthread_for_students(\context $context): void {
+        global $DB;
+        $studentroleid = $DB->get_field('role', 'id', ['shortname' => 'student'], MUST_EXIST);
+        assign_capability('filter/embeddiscussion:createthread', CAP_PROHIBIT, $studentroleid, $context->id, true);
+        $context->mark_dirty();
+    }
+
     public function test_get_or_create_thread_is_idempotent(): void {
         $this->resetAfterTest();
         $this->setAdminUser();
@@ -65,6 +81,7 @@ final class manager_test extends \advanced_testcase {
         $course = $this->getDataGenerator()->create_course();
         $context = \context_course::instance($course->id);
         $student = $this->getDataGenerator()->create_and_enrol($course, 'student');
+        $this->prohibit_createthread_for_students($context);
 
         $this->setUser($student);
         $this->expectException(\required_capability_exception::class);
@@ -76,6 +93,7 @@ final class manager_test extends \advanced_testcase {
         $course = $this->getDataGenerator()->create_course();
         $context = \context_course::instance($course->id);
         $student = $this->getDataGenerator()->create_and_enrol($course, 'student');
+        $this->prohibit_createthread_for_students($context);
 
         $this->setAdminUser();
         $created = manager::get_or_create_thread('Shared', $context, 'Original name');
@@ -92,6 +110,7 @@ final class manager_test extends \advanced_testcase {
         $course = $this->getDataGenerator()->create_course();
         $context = \context_course::instance($course->id);
         $student = $this->getDataGenerator()->create_and_enrol($course, 'student');
+        $this->prohibit_createthread_for_students($context);
 
         $this->setAdminUser();
         $thread = manager::get_or_create_thread('Settings', $context);

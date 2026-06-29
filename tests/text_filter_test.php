@@ -45,6 +45,22 @@ final class text_filter_test extends \advanced_testcase {
     }
 
     /**
+     * Prohibit filter/embeddiscussion:createthread for the student role in a context.
+     *
+     * Students are granted this capability by default (for rollover scenarios), so a
+     * test that needs to exercise the "user lacks createthread" path must remove it
+     * explicitly rather than relying on the archetype default.
+     *
+     * @param \context $context
+     */
+    protected function prohibit_createthread_for_students(\context $context): void {
+        global $DB;
+        $studentroleid = $DB->get_field('role', 'id', ['shortname' => 'student'], MUST_EXIST);
+        assign_capability('filter/embeddiscussion:createthread', CAP_PROHIBIT, $studentroleid, $context->id, true);
+        $context->mark_dirty();
+    }
+
+    /**
      * Configure legacy token conversion settings for this test.
      *
      * @param bool $disqusenabled whether [[filter_disqus]] conversion is enabled
@@ -251,6 +267,7 @@ final class text_filter_test extends \advanced_testcase {
         $course = $this->getDataGenerator()->create_course();
         $student = $this->getDataGenerator()->create_and_enrol($course, 'student');
         $context = \context_course::instance($course->id);
+        $this->prohibit_createthread_for_students($context);
         $this->setUser($student);
 
         // A named token whose thread does not exist yet: the student lacks
@@ -289,6 +306,7 @@ final class text_filter_test extends \advanced_testcase {
         $course = $this->getDataGenerator()->create_course();
         $student = $this->getDataGenerator()->create_and_enrol($course, 'student');
         $context = \context_course::instance($course->id);
+        $this->prohibit_createthread_for_students($context);
 
         // An editor visits first and initialises the thread.
         $this->setAdminUser();
