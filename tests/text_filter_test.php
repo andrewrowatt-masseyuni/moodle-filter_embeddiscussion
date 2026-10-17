@@ -16,563 +16,171 @@
 
 namespace filter_embeddiscussion;
 
-/**
- * PHPUnit tests for filter_embeddiscussion text filtering.
- *
- * @package    filter_embeddiscussion
- * @copyright  2026 Andrew Rowatt <A.J.Rowatt@massey.ac.nz>
- * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- */
+use local_embeddiscussion\threads;
+use local_embeddiscussion\token;
 
 /**
- * Tests for the text filter.
+ * Tests for the embedded discussion filter.
  *
  * @package    filter_embeddiscussion
  * @category   test
  * @copyright  2026 Andrew Rowatt <A.J.Rowatt@massey.ac.nz>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- * @covers \filter_embeddiscussion\text_filter
+ * @covers     \filter_embeddiscussion\text_filter
  */
 final class text_filter_test extends \advanced_testcase {
     /**
-     * Create a filter instance for the given context.
-     *
-     * @param \context $context
-     * @return text_filter
+     * Reset the per-request thread cache, which is keyed on ids PHPUnit reuses.
      */
-    protected function create_book_filter(\context $context): text_filter {
-        return new text_filter($context, []);
+    protected function setUp(): void {
+        parent::setUp();
+        $this->resetAfterTest();
+        threads::reset_cache();
     }
 
     /**
-     * Prohibit filter/embeddiscussion:createthread for the student role in a context.
+     * The generator.
      *
-     * Students are granted this capability by default (for rollover scenarios), so a
-     * test that needs to exercise the "user lacks createthread" path must remove it
-     * explicitly rather than relying on the archetype default.
-     *
-     * @param \context $context
+     * @return \local_embeddiscussion_generator
      */
-    protected function prohibit_createthread_for_students(\context $context): void {
-        global $DB;
-        $studentroleid = $DB->get_field('role', 'id', ['shortname' => 'student'], MUST_EXIST);
-        assign_capability('filter/embeddiscussion:createthread', CAP_PROHIBIT, $studentroleid, $context->id, true);
-        $context->mark_dirty();
+    protected function generator(): \local_embeddiscussion_generator {
+        return $this->getDataGenerator()->get_plugin_generator('local_embeddiscussion');
     }
 
     /**
-     * Configure legacy token conversion settings for this test.
+     * Filter some text in a context.
      *
-     * @param bool $disqusenabled whether [[filter_disqus]] conversion is enabled
-     * @param bool $commentsenabled whether {comments} conversion is enabled
-     */
-    protected function configure_legacy_token_handling(bool $disqusenabled, bool $commentsenabled): void {
-        set_config('legacyfilterdisqus', $disqusenabled ? 1 : 0, 'filter_embeddiscussion');
-        set_config('legacycomments', $commentsenabled ? 1 : 0, 'filter_embeddiscussion');
-    }
-
-    /**
-     * Return the persisted thread name.
-     *
-     * @param \stdClass $thread
+     * @param string $text The text.
+     * @param \context $context The context.
      * @return string
      */
-    protected function get_thread_name(\stdClass $thread): string {
-        return (string)($thread->threadname ?? '');
+    protected function filter(string $text, \context $context): string {
+        return (new text_filter($context, []))->filter($text);
     }
 
-    public function test_filter_no_token_passes_through(): void {
-        $this->resetAfterTest();
-        $context = \context_system::instance();
-        $filter = $this->create_book_filter($context);
-        $input = '<p>Hello world</p>';
-        $this->assertSame($input, $filter->filter($input));
-    }
-
-    public function test_filter_replaces_discussion_token_with_skeleton(): void {
-        $this->resetAfterTest();
-        $this->setAdminUser();
-        $context = \context_system::instance();
-        $filter = $this->create_book_filter($context);
-        $output = $filter->filter('Before {discussion:My thread} after');
-        $thread = manager::find_thread('My thread', $context->id);
-        $this->assertNotNull($thread);
-        $this->assertSame(0, (int)$thread->anonymous);
-        $this->assertSame('My thread', $this->get_thread_name($thread));
-        $this->assertStringContainsString('data-region="filter-embeddiscussion"', $output);
-        $this->assertStringContainsString('data-threadid="' . (int)$thread->id . '"', $output);
-        $this->assertStringNotContainsString('data-thread-name', $output);
-        $this->assertStringNotContainsString('data-anonymous', $output);
-        $this->assertStringContainsString('Before', $output);
-        $this->assertStringContainsString('after', $output);
-    }
-
-    public function test_filter_supports_anondiscussion_token(): void {
-        $this->resetAfterTest();
-        $this->setAdminUser();
-        $context = \context_system::instance();
-        $filter = $this->create_book_filter($context);
-        $output = $filter->filter('{anondiscussion:Alt}');
-        $thread = manager::find_thread('Alt', $context->id);
-        $this->assertNotNull($thread);
-        $this->assertSame(1, (int)$thread->anonymous);
-        $this->assertStringContainsString('data-threadid="' . (int)$thread->id . '"', $output);
-    }
-
-    public function test_filter_supports_anonymousdiscussion_alias(): void {
-        $this->resetAfterTest();
-        $this->setAdminUser();
-        $context = \context_system::instance();
-        $filter = $this->create_book_filter($context);
-        $output = $filter->filter('{anonymousdiscussion:Alias}');
-        $thread = manager::find_thread('Alias', $context->id);
-        $this->assertNotNull($thread);
-        $this->assertSame(1, (int)$thread->anonymous);
-        $this->assertStringContainsString('data-threadid="' . (int)$thread->id . '"', $output);
-    }
-
-    public function test_filter_stores_threadname_for_explicit_name(): void {
-        $this->resetAfterTest();
-        $this->setAdminUser();
-        $context = \context_system::instance();
-        $filter = $this->create_book_filter($context);
-        $filter->filter('{discussion:lesson-2}');
-        $thread = manager::find_thread('lesson-2', $context->id);
-        $this->assertNotNull($thread);
-        $this->assertSame('lesson-2', $this->get_thread_name($thread));
-    }
-
-    public function test_filter_handles_multiple_tokens(): void {
-        $this->resetAfterTest();
-        $this->setAdminUser();
-        $context = \context_system::instance();
-        $filter = $this->create_book_filter($context);
-        $output = $filter->filter('{discussion:A} mid {anondiscussion:B}');
-        $this->assertSame(2, substr_count($output, 'data-region="filter-embeddiscussion"'));
-        $threada = manager::find_thread('A', $context->id);
-        $threadb = manager::find_thread('B', $context->id);
-        $this->assertNotNull($threada);
-        $this->assertNotNull($threadb);
-        $this->assertSame(0, (int)$threada->anonymous);
-        $this->assertSame(1, (int)$threadb->anonymous);
-        $this->assertStringContainsString('data-threadid="' . (int)$threada->id . '"', $output);
-        $this->assertStringContainsString('data-threadid="' . (int)$threadb->id . '"', $output);
-    }
-
-    public function test_filter_renders_discussiondashboard_placeholder_in_course_context(): void {
-        global $PAGE;
-        $this->resetAfterTest();
+    /**
+     * An activity's token becomes a placeholder naming its thread by id, and nothing of the token
+     * is left - so a second pass, as mod_lesson makes, has nothing to replace.
+     */
+    public function test_activity_token(): void {
         $course = $this->getDataGenerator()->create_course();
-        $PAGE->set_course($course);
+        $page = $this->getDataGenerator()->create_module('page', ['course' => $course->id]);
+        $context = \context_module::instance($page->cmid);
+        $thread = $this->generator()->create_thread(['cmid' => $page->cmid]);
+        $this->setUser($this->getDataGenerator()->create_and_enrol($course, 'student'));
+
+        // As TinyMCE saves it: padded, attributes in its own order.
+        $text = '<p>Before</p><div data-embeddiscussion="' . $thread->embedkey .
+            '" class="embeddiscussion-embed">&nbsp;</div><p>After</p>';
+        $filtered = $this->filter($text, $context);
+
+        $this->assertStringContainsString('<p>Before</p>', $filtered);
+        $this->assertStringContainsString('<p>After</p>', $filtered);
+        $this->assertStringContainsString('data-region="filter-embeddiscussion"', $filtered);
+        $this->assertStringContainsString('data-threadid="' . $thread->id . '"', $filtered);
+        $this->assertStringContainsString('embeddisc-skeleton', $filtered);
+        $this->assertStringNotContainsString('data-embeddiscussion', $filtered);
+        $this->assertStringNotContainsString($thread->embedkey, $filtered);
+        $this->assertSame($filtered, $this->filter($filtered, $context));
+    }
+
+    /**
+     * Text with no token is returned as it is.
+     */
+    public function test_no_token(): void {
+        $course = $this->getDataGenerator()->create_course();
         $context = \context_course::instance($course->id);
-        $filter = $this->create_book_filter($context);
-        $output = $filter->filter('{discussiondashboard}');
-        $this->assertStringContainsString('data-region="filter-embeddiscussion-dashboard"', $output);
-        $this->assertStringContainsString('data-courseid="' . (int)$course->id . '"', $output);
+
+        $this->assertSame('<p>Nothing here</p>', $this->filter('<p>Nothing here</p>', $context));
     }
 
-    public function test_filter_defaults_thread_name_to_book_and_chapter_in_book_context(): void {
-        global $PAGE;
-        $this->resetAfterTest();
-        $this->setAdminUser();
-
+    /**
+     * A token copied in from another activity does not resolve: a notice for someone who could fix
+     * it, nothing for anyone else.
+     */
+    public function test_token_from_another_activity(): void {
         $course = $this->getDataGenerator()->create_course();
-        $book = $this->getDataGenerator()->create_module('book', [
-            'course' => $course->id,
-            'name' => 'Book A',
-        ]);
-        $bookgen = $this->getDataGenerator()->get_plugin_generator('mod_book');
-        $bookgen->create_chapter(['bookid' => $book->id, 'title' => 'Chapter 1', 'pagenum' => 1]);
-        $context = \context_module::instance($book->cmid);
+        $page1 = $this->getDataGenerator()->create_module('page', ['course' => $course->id]);
+        $page2 = $this->getDataGenerator()->create_module('page', ['course' => $course->id]);
+        $thread = $this->generator()->create_thread(['cmid' => $page1->cmid]);
+        $context = \context_module::instance($page2->cmid);
+        $text = '<p>Text</p>' . token::html($thread->embedkey);
 
-        $PAGE->set_course($course);
-        $PAGE->set_context($context);
-        $PAGE->set_url(new \moodle_url('/mod/book/view.php', ['id' => $book->cmid]));
+        $this->setUser($this->getDataGenerator()->create_and_enrol($course, 'editingteacher'));
+        $filtered = $this->filter($text, $context);
+        $this->assertStringContainsString('embeddisc-notfound', $filtered);
+        $this->assertStringNotContainsString('data-threadid', $filtered);
 
-        $filter = new text_filter($context, []);
-        $output = $filter->filter('Before {discussion} after');
-        $threadname = get_string('bookchapterthreadname', 'filter_embeddiscussion', (object)[
-            'book' => 'Book A',
-            'chapter' => 'Chapter 1',
-        ]);
-        $thread = manager::find_thread($threadname, $context->id);
-        $this->assertNotNull($thread);
-        $this->assertSame($threadname, $this->get_thread_name($thread));
-        $this->assertSame(0, (int)$thread->anonymous);
-        $this->assertStringContainsString('data-region="filter-embeddiscussion"', $output);
-        $this->assertStringContainsString('data-threadid="' . (int)$thread->id . '"', $output);
+        $this->setUser($this->getDataGenerator()->create_and_enrol($course, 'student'));
+        $this->assertSame('<p>Text</p>', $this->filter($text, $context));
     }
 
-    public function test_filter_defaults_anonymous_thread_name_to_book_and_chapter_in_book_context(): void {
-        global $PAGE;
-        $this->resetAfterTest();
-        $this->setAdminUser();
-
+    /**
+     * Text in a course context - a section summary - shows the course's section threads, and no
+     * draft: a draft is not on any page until its activity adopts it.
+     */
+    public function test_section_token(): void {
         $course = $this->getDataGenerator()->create_course();
-        $book = $this->getDataGenerator()->create_module('book', [
-            'course' => $course->id,
-            'name' => 'Book A',
-        ]);
-        $bookgen = $this->getDataGenerator()->get_plugin_generator('mod_book');
-        $bookgen->create_chapter(['bookid' => $book->id, 'title' => 'Chapter 1', 'pagenum' => 1]);
-        $context = \context_module::instance($book->cmid);
-
-        $PAGE->set_course($course);
-        $PAGE->set_context($context);
-        $PAGE->set_url(new \moodle_url('/mod/book/view.php', ['id' => $book->cmid]));
-
-        $filter = new text_filter($context, []);
-        $output = $filter->filter('{anondiscussion}');
-        $threadname = get_string('bookchapterthreadname', 'filter_embeddiscussion', (object)[
-            'book' => 'Book A',
-            'chapter' => 'Chapter 1',
-        ]);
-        $thread = manager::find_thread($threadname, $context->id);
-        $this->assertNotNull($thread);
-        $this->assertSame($threadname, $this->get_thread_name($thread));
-        $this->assertSame(1, (int)$thread->anonymous);
-        $this->assertStringContainsString('data-threadid="' . (int)$thread->id . '"', $output);
-    }
-
-    public function test_filter_requires_name_in_book_without_resolvable_chapter(): void {
-        global $PAGE;
-        $this->resetAfterTest();
-        $this->setAdminUser();
-
-        // A Book with no chapters cannot resolve a chapter title, so it is not a
-        // Book chapter for naming purposes and an explicit thread name is required.
-        $course = $this->getDataGenerator()->create_course();
-        $book = $this->getDataGenerator()->create_module('book', [
-            'course' => $course->id,
-            'name' => 'Book A',
-        ]);
-        $context = \context_module::instance($book->cmid);
-
-        $PAGE->set_course($course);
-        $PAGE->set_context($context);
-        $PAGE->set_url(new \moodle_url('/mod/book/view.php', ['id' => $book->cmid]));
-
-        $filter = new text_filter($context, []);
-        $output = $filter->filter('{discussion}');
-
-        // No thread is created and the staff "name required" notice is shown.
-        $this->assertNull(manager::find_thread('context-' . (int)$context->id, $context->id));
-        $this->assertStringNotContainsString('data-region="filter-embeddiscussion"', $output);
-        $this->assertStringContainsString('data-region="filter-embeddiscussion-namerequired"', $output);
-        $this->assertStringContainsString('A thread name is required', $output);
-    }
-
-    public function test_filter_shows_uninitialised_notice_when_user_lacks_createthread_capability(): void {
-        $this->resetAfterTest();
-        $course = $this->getDataGenerator()->create_course();
-        $student = $this->getDataGenerator()->create_and_enrol($course, 'student');
         $context = \context_course::instance($course->id);
-        $this->prohibit_createthread_for_students($context);
-        $this->setUser($student);
+        $section = $this->generator()->create_section_thread(['courseid' => $course->id, 'section' => 1]);
+        $draft = $this->generator()->create_thread(['courseid' => $course->id]);
+        $this->setUser($this->getDataGenerator()->create_and_enrol($course, 'student'));
 
-        // A named token whose thread does not exist yet: the student lacks
-        // filter/embeddiscussion:createthread so cannot initialise it, and sees a
-        // student-friendly notice instead of the raw token.
-        $filter = new text_filter($context, []);
-        $output = $filter->filter('Before {discussion:Week 1} after');
-
-        $this->assertNull(manager::find_thread('Week 1', $context->id));
-        $this->assertStringNotContainsString('data-region="filter-embeddiscussion"', $output);
-        $this->assertStringContainsString('data-region="filter-embeddiscussion-uninitialised"', $output);
-        $this->assertStringContainsString('advise your teaching team', $output);
-        $this->assertStringNotContainsString('{discussion', $output);
+        $this->assertStringContainsString(
+            'data-threadid="' . $section->id . '"',
+            $this->filter(token::html($section->embedkey), $context)
+        );
+        $this->assertSame('', $this->filter(token::html($draft->embedkey), $context));
     }
 
-    public function test_filter_requires_name_outside_book_shows_student_message(): void {
-        $this->resetAfterTest();
+    /**
+     * The dashboard's token becomes the course's dashboard, wherever in the course it is.
+     */
+    public function test_dashboard_token(): void {
         $course = $this->getDataGenerator()->create_course();
-        $student = $this->getDataGenerator()->create_and_enrol($course, 'student');
-        $context = \context_course::instance($course->id);
-        $this->setUser($student);
+        $page = $this->getDataGenerator()->create_module('page', ['course' => $course->id]);
+        $this->setUser($this->getDataGenerator()->create_and_enrol($course, 'student'));
 
-        $filter = new text_filter($context, []);
-        $output = $filter->filter('Before {discussion} after');
-
-        // A student (no moodle/course:manageactivities) gets the generic notice
-        // and no thread is created from the nameless token.
-        $this->assertNull(manager::find_thread('context-' . (int)$context->id, $context->id));
-        $this->assertStringNotContainsString('data-region="filter-embeddiscussion"', $output);
-        $this->assertStringContainsString('data-region="filter-embeddiscussion-uninitialised"', $output);
-        $this->assertStringContainsString('advise your teaching team', $output);
-    }
-
-    public function test_filter_renders_existing_thread_for_student_without_createthread(): void {
-        $this->resetAfterTest();
-        $course = $this->getDataGenerator()->create_course();
-        $student = $this->getDataGenerator()->create_and_enrol($course, 'student');
-        $context = \context_course::instance($course->id);
-        $this->prohibit_createthread_for_students($context);
-
-        // An editor visits first and initialises the thread.
-        $this->setAdminUser();
-        $filter = new text_filter($context, []);
-        $filter->filter('{discussion:Existing}');
-        $thread = manager::find_thread('Existing', $context->id);
-        $this->assertNotNull($thread);
-
-        // The student now sees the rendered placeholder for the existing thread.
-        $this->setUser($student);
-        $studentfilter = new text_filter($context, []);
-        $output = $studentfilter->filter('{discussion:Existing}');
-        $this->assertStringContainsString('data-region="filter-embeddiscussion"', $output);
-        $this->assertStringContainsString('data-threadid="' . (int)$thread->id . '"', $output);
-    }
-
-    public function test_filter_requires_name_outside_book_shows_staff_message(): void {
-        global $PAGE;
-
-        $this->resetAfterTest();
-        $course = $this->getDataGenerator()->create_course();
-        $user = $this->getDataGenerator()->create_user();
-        $this->getDataGenerator()->enrol_user($user->id, $course->id, 'editingteacher');
-        $this->setUser($user);
-
-        $coursecontext = \context_course::instance($course->id);
-        $PAGE->set_course($course);
-        $PAGE->set_context($coursecontext);
-        $filter = new text_filter($coursecontext, []);
-        $output = $filter->filter('Before {discussion} after');
-
-        // An editing teacher (moodle/course:manageactivities) is told a name is
-        // required; no thread is created from the nameless token.
-        $this->assertNull(manager::find_thread('context-' . (int)$coursecontext->id, $coursecontext->id));
-        $this->assertStringNotContainsString('data-region="filter-embeddiscussion"', $output);
-        $this->assertStringContainsString('data-region="filter-embeddiscussion-namerequired"', $output);
-        $this->assertStringContainsString('A thread name is required', $output);
-        $this->assertStringContainsString('Before', $output);
-        $this->assertStringContainsString('after', $output);
-    }
-
-    public function test_filter_renders_named_discussion_token_outside_book_context(): void {
-        $this->resetAfterTest();
-        $this->setAdminUser();
-        $context = \context_system::instance();
-        $filter = new text_filter($context, []);
-        $output = $filter->filter('Before {discussion:My thread} after');
-
-        $thread = manager::find_thread('My thread', $context->id);
-        $this->assertNotNull($thread);
-        $this->assertStringContainsString('data-region="filter-embeddiscussion"', $output);
-        $this->assertStringContainsString('data-threadid="' . (int)$thread->id . '"', $output);
-    }
-
-    public function test_convert_legacy_tokens_basic_disqus(): void {
-        $this->resetAfterTest();
-        $this->configure_legacy_token_handling(true, false);
-        $output = text_filter::convert_legacy_tokens('Before [[filter_disqus]] after');
-        $this->assertSame('Before {discussion} after', $output);
-    }
-
-    public function test_convert_legacy_tokens_does_not_convert_disqus_with_segment(): void {
-        $this->resetAfterTest();
-        $this->configure_legacy_token_handling(true, false);
-        $input = '[[filter_disqus:book-23]]';
-        $this->assertSame($input, text_filter::convert_legacy_tokens($input));
-    }
-
-    public function test_convert_legacy_tokens_comments(): void {
-        $this->resetAfterTest();
-        $this->configure_legacy_token_handling(false, true);
-        $output = text_filter::convert_legacy_tokens('Comments here: {comments}');
-        $this->assertSame('Comments here: {discussion}', $output);
-    }
-
-    public function test_convert_legacy_tokens_rewrites_without_page_title_dependency(): void {
-        $this->resetAfterTest();
-        $this->configure_legacy_token_handling(true, false);
-        $output = text_filter::convert_legacy_tokens('[[filter_disqus]]');
-        $this->assertSame('{discussion}', $output);
-    }
-
-    public function test_convert_legacy_tokens_converts_when_title_empty(): void {
-        $this->resetAfterTest();
-        $this->configure_legacy_token_handling(true, true);
-        $input = 'Untouched [[filter_disqus]] {comments}';
-        $this->assertSame('Untouched {discussion} {discussion}', text_filter::convert_legacy_tokens($input));
-    }
-
-    public function test_convert_legacy_tokens_leaves_text_when_both_options_disabled(): void {
-        $this->resetAfterTest();
-        $this->configure_legacy_token_handling(false, false);
-        $input = 'Untouched [[filter_disqus]] {comments}';
-        $this->assertSame($input, text_filter::convert_legacy_tokens($input));
-    }
-
-    public function test_convert_legacy_tokens_handles_disqus_only_when_enabled(): void {
-        $this->resetAfterTest();
-        $this->configure_legacy_token_handling(true, false);
-        $input = 'A [[filter_disqus]] B {comments}';
-        $this->assertSame('A {discussion} B {comments}', text_filter::convert_legacy_tokens($input));
-    }
-
-    public function test_convert_legacy_tokens_handles_comments_only_when_enabled(): void {
-        $this->resetAfterTest();
-        $this->configure_legacy_token_handling(false, true);
-        $input = 'A [[filter_disqus]] B {comments}';
-        $this->assertSame('A [[filter_disqus]] B {discussion}', text_filter::convert_legacy_tokens($input));
-    }
-
-    public function test_filter_renders_legacy_disqus_token(): void {
-        global $PAGE;
-        $this->resetAfterTest();
-        $this->setAdminUser();
-        $this->configure_legacy_token_handling(true, false);
-
-        $course = $this->getDataGenerator()->create_course();
-        $book = $this->getDataGenerator()->create_module('book', [
-            'course' => $course->id,
-            'name' => 'Book A',
-        ]);
-        $bookgen = $this->getDataGenerator()->get_plugin_generator('mod_book');
-        $bookgen->create_chapter(['bookid' => $book->id, 'title' => 'Chapter 1', 'pagenum' => 1]);
-        $context = \context_module::instance($book->cmid);
-
-        $PAGE->set_course($course);
-        $PAGE->set_context($context);
-        $PAGE->set_url(new \moodle_url('/mod/book/view.php', ['id' => $book->cmid]));
-        $PAGE->set_title('Course: Course 1', false);
-
-        $filter = new text_filter($context, []);
-        $output = $filter->filter('Before [[filter_disqus]] after');
-        $threadname = get_string('bookchapterthreadname', 'filter_embeddiscussion', (object)[
-            'book' => 'Book A',
-            'chapter' => 'Chapter 1',
-        ]);
-        $thread = manager::find_thread($threadname, $context->id);
-        $this->assertNotNull($thread);
-        $this->assertStringContainsString('data-region="filter-embeddiscussion"', $output);
-        $this->assertStringContainsString('data-threadid="' . (int)$thread->id . '"', $output);
-    }
-
-    public function test_filter_renders_legacy_comments_token(): void {
-        global $PAGE;
-        $this->resetAfterTest();
-        $this->setAdminUser();
-        $this->configure_legacy_token_handling(false, true);
-
-        $course = $this->getDataGenerator()->create_course();
-        $book = $this->getDataGenerator()->create_module('book', [
-            'course' => $course->id,
-            'name' => 'Book A',
-        ]);
-        $bookgen = $this->getDataGenerator()->get_plugin_generator('mod_book');
-        $bookgen->create_chapter(['bookid' => $book->id, 'title' => 'Chapter 1', 'pagenum' => 1]);
-        $context = \context_module::instance($book->cmid);
-
-        $PAGE->set_course($course);
-        $PAGE->set_context($context);
-        $PAGE->set_url(new \moodle_url('/mod/book/view.php', ['id' => $book->cmid]));
-        $PAGE->set_title('Course: Course 1', false);
-
-        $filter = new text_filter($context, []);
-        $output = $filter->filter('{comments}');
-        $threadname = get_string('bookchapterthreadname', 'filter_embeddiscussion', (object)[
-            'book' => 'Book A',
-            'chapter' => 'Chapter 1',
-        ]);
-        $thread = manager::find_thread($threadname, $context->id);
-        $this->assertNotNull($thread);
-        $this->assertStringContainsString('data-threadid="' . (int)$thread->id . '"', $output);
-    }
-
-    public function test_filter_leaves_legacy_tokens_untouched_by_default(): void {
-        global $PAGE, $SITE;
-        $this->resetAfterTest();
-        $PAGE->set_title('Course: Course 1', false);
-        $SITE->fullname = 'Acceptance test site';
-        $SITE->shortname = 'Acceptance test site';
-        $context = \context_system::instance();
-        $filter = $this->create_book_filter($context);
-        $input = 'Before [[filter_disqus]] and {comments} after';
-        $output = $filter->filter($input);
-        $this->assertSame($input, $output);
-    }
-
-    public function test_filter_records_zero_itemid_outside_book_context(): void {
-        $this->resetAfterTest();
-        $this->setAdminUser();
-        $context = \context_system::instance();
-        $filter = new text_filter($context, []);
-        $filter->filter('{discussion:Plain thread}');
-
-        $thread = manager::find_thread('Plain thread', $context->id);
-        $this->assertNotNull($thread);
-        $this->assertSame(0, (int)$thread->itemid);
-    }
-
-    public function test_filter_records_first_book_chapter_itemid_without_chapterid(): void {
-        global $PAGE;
-        $this->resetAfterTest();
-        $this->setAdminUser();
-
-        $course = $this->getDataGenerator()->create_course();
-        $book = $this->getDataGenerator()->create_module('book', [
-            'course' => $course->id,
-            'name' => 'Book A',
-        ]);
-        $bookgen = $this->getDataGenerator()->get_plugin_generator('mod_book');
-        $chapter1 = $bookgen->create_chapter(['bookid' => $book->id, 'title' => 'Chapter 1', 'pagenum' => 1]);
-        $bookgen->create_chapter(['bookid' => $book->id, 'title' => 'Chapter 2', 'pagenum' => 2]);
-
-        $context = \context_module::instance($book->cmid);
-        $PAGE->set_course($course);
-        $PAGE->set_context($context);
-        $PAGE->set_url(new \moodle_url('/mod/book/view.php', ['id' => $book->cmid]));
-        $PAGE->set_title('Chapter 1', false);
-
-        $filter = new text_filter($context, []);
-        $filter->filter('{discussion}');
-
-        // With no chapterid request param, itemid falls back to the first chapter.
-        $threadname = get_string('bookchapterthreadname', 'filter_embeddiscussion', (object)[
-            'book' => 'Book A',
-            'chapter' => 'Chapter 1',
-        ]);
-        $thread = manager::find_thread($threadname, $context->id);
-        $this->assertNotNull($thread);
-        $this->assertSame((int)$chapter1->id, (int)$thread->itemid);
-    }
-
-    public function test_filter_records_chapterid_param_as_book_itemid(): void {
-        global $PAGE;
-        $this->resetAfterTest();
-        $this->setAdminUser();
-
-        $course = $this->getDataGenerator()->create_course();
-        $book = $this->getDataGenerator()->create_module('book', [
-            'course' => $course->id,
-            'name' => 'Book A',
-        ]);
-        $bookgen = $this->getDataGenerator()->get_plugin_generator('mod_book');
-        $bookgen->create_chapter(['bookid' => $book->id, 'title' => 'Chapter 1', 'pagenum' => 1]);
-        $chapter2 = $bookgen->create_chapter(['bookid' => $book->id, 'title' => 'Chapter 2', 'pagenum' => 2]);
-
-        $context = \context_module::instance($book->cmid);
-        $PAGE->set_course($course);
-        $PAGE->set_context($context);
-        $PAGE->set_url(new \moodle_url('/mod/book/view.php', ['id' => $book->cmid, 'chapterid' => $chapter2->id]));
-        $PAGE->set_title('Chapter 2', false);
-
-        $_POST['chapterid'] = (string)$chapter2->id;
-        try {
-            $filter = new text_filter($context, []);
-            $filter->filter('{discussion}');
-        } finally {
-            unset($_POST['chapterid']);
+        foreach ([\context_module::instance($page->cmid), \context_course::instance($course->id)] as $context) {
+            $filtered = $this->filter(token::html(token::DASHBOARD), $context);
+            $this->assertStringContainsString('data-region="filter-embeddiscussion-dashboard"', $filtered);
+            $this->assertStringContainsString('data-courseid="' . $course->id . '"', $filtered);
         }
+    }
 
-        // The request chapterid wins over the first-chapter fallback.
-        $threadname = get_string('bookchapterthreadname', 'filter_embeddiscussion', (object)[
-            'book' => 'Book A',
-            'chapter' => 'Chapter 2',
-        ]);
-        $thread = manager::find_thread($threadname, $context->id);
-        $this->assertNotNull($thread);
-        $this->assertSame((int)$chapter2->id, (int)$thread->itemid);
+    /**
+     * Anywhere no thread can belong - the front page, a user's profile - a token becomes nothing,
+     * and so does the dashboard's, which needs a course.
+     */
+    public function test_tokens_outside_a_course(): void {
+        $this->setAdminUser();
+        $thread = $this->generator()->create_thread(['courseid' => $this->getDataGenerator()->create_course()->id]);
+
+        $elsewhere = [\context_course::instance(SITEID), \context_system::instance(), \context_user::instance(get_admin()->id)];
+        foreach ($elsewhere as $ctx) {
+            $this->assertSame('<p>x</p>', $this->filter('<p>x</p>' . token::html($thread->embedkey), $ctx));
+            $this->assertSame('<p>x</p>', $this->filter('<p>x</p>' . token::html(token::DASHBOARD), $ctx));
+        }
+    }
+
+    /**
+     * Each thread's placeholder loads the discussion module once, however many there are.
+     */
+    public function test_requires_the_discussion_module_once(): void {
+        global $PAGE;
+
+        $course = $this->getDataGenerator()->create_course();
+        $page = $this->getDataGenerator()->create_module('page', ['course' => $course->id]);
+        $context = \context_module::instance($page->cmid);
+        $one = $this->generator()->create_thread(['cmid' => $page->cmid]);
+        $two = $this->generator()->create_thread(['cmid' => $page->cmid]);
+        $this->setUser($this->getDataGenerator()->create_and_enrol($course, 'student'));
+
+        $this->filter(token::html($one->embedkey) . token::html($two->embedkey), $context);
+        $this->filter(token::html($one->embedkey), $context);
+
+        $amdjscode = (new \ReflectionProperty($PAGE->requires, 'amdjscode'))->getValue($PAGE->requires);
+        $calls = array_filter($amdjscode, fn($code) => str_contains($code, "require(['local_embeddiscussion/discussion']"));
+        $this->assertCount(1, $calls);
     }
 }
