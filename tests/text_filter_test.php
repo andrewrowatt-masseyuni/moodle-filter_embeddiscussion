@@ -134,23 +134,7 @@ final class text_filter_test extends \advanced_testcase {
     }
 
     /**
-     * The dashboard's token becomes the course's dashboard, wherever in the course it is.
-     */
-    public function test_dashboard_token(): void {
-        $course = $this->getDataGenerator()->create_course();
-        $page = $this->getDataGenerator()->create_module('page', ['course' => $course->id]);
-        $this->setUser($this->getDataGenerator()->create_and_enrol($course, 'student'));
-
-        foreach ([\context_module::instance($page->cmid), \context_course::instance($course->id)] as $context) {
-            $filtered = $this->filter(token::html(token::DASHBOARD), $context);
-            $this->assertStringContainsString('data-region="filter-embeddiscussion-dashboard"', $filtered);
-            $this->assertStringContainsString('data-courseid="' . $course->id . '"', $filtered);
-        }
-    }
-
-    /**
-     * Anywhere no thread can belong - the front page, a user's profile - a token becomes nothing,
-     * and so does the dashboard's, which needs a course.
+     * Anywhere no thread can belong - the front page, a user's profile - a token becomes nothing.
      */
     public function test_tokens_outside_a_course(): void {
         $this->setAdminUser();
@@ -159,7 +143,6 @@ final class text_filter_test extends \advanced_testcase {
         $elsewhere = [\context_course::instance(SITEID), \context_system::instance(), \context_user::instance(get_admin()->id)];
         foreach ($elsewhere as $ctx) {
             $this->assertSame('<p>x</p>', $this->filter('<p>x</p>' . token::html($thread->embedkey), $ctx));
-            $this->assertSame('<p>x</p>', $this->filter('<p>x</p>' . token::html(token::DASHBOARD), $ctx));
         }
     }
 

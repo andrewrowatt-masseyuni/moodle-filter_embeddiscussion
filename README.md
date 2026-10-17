@@ -14,8 +14,7 @@ Replaces each embedded discussion token -
 **Embedded discussion** button - with a placeholder the discussion loads into. The key names a thread
 in `local_embeddiscussion`, where its name and anonymity live; the filter only finds the thread in the
 place the text belongs to - the activity, or for a section summary any of the course's sections, since
-a filter is not told which section it is formatting. The token with the key `dashboard` becomes the
-course's discussion dashboard.
+a filter is not told which section it is formatting.
 
 Nothing is ever created here. A token whose thread belongs somewhere else - pasted in from another
 activity, say - shows a short notice to someone who may embed discussions, and nothing to anyone else.

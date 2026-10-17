@@ -26,8 +26,7 @@ use local_embeddiscussion\token;
  * A token is an empty <div data-embeddiscussion="KEY"> naming a thread in local_embeddiscussion,
  * which tiny_embeddiscussion put there. The thread, its name and whether it is anonymous all live in
  * local_embeddiscussion; this filter only finds the thread the token names, in the place the text
- * belongs to, and puts a placeholder there for the discussion to load into. The token with the key
- * "dashboard" becomes the course's discussion dashboard instead.
+ * belongs to, and puts a placeholder there for the discussion to load into.
  *
  * Nothing is ever made here. A token with no thread in this place - copied in from another activity,
  * say - shows a notice to someone who could fix it, and nothing to anyone else.
@@ -66,14 +65,6 @@ class text_filter extends \core_filters\text_filter {
      * @return string HTML, or ''.
      */
     protected function replace(string $key): string {
-        if ($key === token::DASHBOARD) {
-            $coursecontext = $this->context->get_course_context(false);
-            if (!$coursecontext || (int)$coursecontext->instanceid === (int)SITEID) {
-                return '';
-            }
-            return embed::render_dashboard((int)$coursecontext->instanceid);
-        }
-
         // Anywhere a thread cannot belong: nothing. A token there was copied in from somewhere else.
         $threads = $this->threads();
         if ($threads === null) {
