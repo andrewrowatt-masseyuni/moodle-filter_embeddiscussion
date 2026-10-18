@@ -79,6 +79,8 @@ final class text_filter_test extends \advanced_testcase {
         $this->assertStringContainsString('data-region="filter-embeddiscussion"', $filtered);
         $this->assertStringContainsString('data-threadid="' . $thread->id . '"', $filtered);
         $this->assertStringContainsString('embeddisc-skeleton', $filtered);
+        // The page's skeleton keeps its posts, which the editor's preview leaves out.
+        $this->assertStringContainsString('embeddisc-skeleton-post', $filtered);
         $this->assertStringNotContainsString('data-embeddiscussion', $filtered);
         $this->assertStringNotContainsString($thread->embedkey, $filtered);
         $this->assertSame($filtered, $this->filter($filtered, $context));

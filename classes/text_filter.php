@@ -24,7 +24,7 @@ use local_embeddiscussion\token;
  * Replaces embedded discussion tokens with the discussion.
  *
  * A token is an empty <div data-embeddiscussion="KEY"> naming a thread in local_embeddiscussion,
- * which tiny_embeddiscussion put there. The thread, its name and whether it is anonymous all live in
+ * which tiny_embeddiscussion put there. The thread and whether it is anonymous both live in
  * local_embeddiscussion; this filter only finds the thread the token names, in the place the text
  * belongs to, and puts a placeholder there for the discussion to load into.
  *

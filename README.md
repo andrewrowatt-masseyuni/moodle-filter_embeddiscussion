@@ -12,7 +12,7 @@ lib/editor/tiny/plugins/embeddiscussion
 Replaces each embedded discussion token -
 `<div class="embeddiscussion-embed" data-embeddiscussion="KEY"></div>`, put there by the editor's
 **Embedded discussion** button - with a placeholder the discussion loads into. The key names a thread
-in `local_embeddiscussion`, where its name and anonymity live; the filter only finds the thread in the
+in `local_embeddiscussion`, where its anonymity lives; the filter only finds the thread in the
 place the text belongs to - the activity, or for a section summary any of the course's sections, since
 a filter is not told which section it is formatting.
 
