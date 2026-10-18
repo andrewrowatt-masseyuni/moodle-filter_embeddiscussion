@@ -15,7 +15,7 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * English language pack for Embeddiscussion.
+ * Strings for the embedded discussion filter.
  *
  * @package    filter_embeddiscussion
  * @category   string
@@ -25,95 +25,6 @@
 
 defined('MOODLE_INTERNAL') || die();
 
-$string['allposts'] = 'All posts';
-$string['anonymous'] = 'Anonymous';
-$string['anonymousnotice'] = 'Your posts will be anonymous to other students.';
-$string['anonymousnoticemanager'] = 'Student posts will appear as anonymous to other students.';
-$string['befirsttocomment'] = 'Be the first to comment.';
-$string['bookchapterthreadname'] = '{$a->book} \ {$a->chapter}';
-$string['cachedef_identicons'] = 'Cache definition for identicons';
-$string['cancel'] = 'Cancel';
-$string['cannotbeembeddedhere'] = 'Discussions cannot be embedded here. Only Book chapters are currently supported';
-$string['comment'] = 'Comment';
-$string['comments'] = '{$a} Comments';
-$string['dashboard_empty'] = 'No posts yet in visible discussions.';
-$string['dashboard_never'] = 'Showing all posts (this is your first visit).';
-$string['dashboard_since'] = 'Posts newer than {$a} are highlighted.';
-$string['delete'] = 'Delete';
-$string['deleteconfirm'] = 'Delete this post?';
-$string['deleted_post'] = 'Post deleted.';
-$string['edit'] = 'Edit';
-$string['edited'] = 'edited';
-$string['embeddiscussion:createpost'] = 'Post in an embedded discussion';
-$string['embeddiscussion:createthread'] = 'Initialise an embedded discussion thread';
-$string['embeddiscussion:deleteanypost'] = 'Delete any post in an embedded discussion';
-$string['embeddiscussion:deleteownpost'] = 'Delete own posts in an embedded discussion';
-$string['embeddiscussion:editownpost'] = 'Edit own posts in an embedded discussion';
-$string['embeddiscussion:manageposts'] = 'Manage (delete) any post in an embedded discussion';
-$string['embeddiscussion:managethreads'] = 'View and manage all embedded discussion threads in a course';
-$string['embeddiscussion:viewallauthorsinanonymousthreads'] = 'See all real authors in anonymous embedded discussion threads';
-$string['embeddiscussion:viewallauthorsinanonymousthreads_help'] = 'Users with this capability see the real names of every author in threads marked anonymous, and their own real name is shown to other readers. Users without it see anonymised handles for other authors and appear anonymously themselves. By default this is granted to teachers, editing teachers, and managers, and not to students.';
-$string['error_emptypost'] = 'Post content cannot be empty.';
-$string['error_invalidthread'] = 'Invalid thread.';
-$string['error_nopermission'] = 'You do not have permission to perform that action.';
-$string['event:post_created'] = 'Embedded discussion post created';
-$string['event:post_deleted'] = 'Embedded discussion post deleted';
-$string['event:post_edited'] = 'Embedded discussion post edited';
-$string['event:post_reacted'] = 'Embedded discussion post reacted to';
-$string['event:thread_deleted'] = 'Embedded discussion thread deleted';
-$string['event:thread_initialised'] = 'Embedded discussion thread initialised';
 $string['filtername'] = 'Embedded discussion';
-$string['jointhediscussion'] = 'Join the discussion…';
-$string['newest'] = 'Newest';
-$string['nocomments'] = '0 Comments';
-$string['nothreads'] = 'No embedded discussions in this course.';
-$string['oldest'] = 'Oldest';
-$string['onecomment'] = '1 Comment';
 $string['pluginname'] = 'Embedded discussion';
-$string['post'] = 'Post';
-$string['privacy:metadata'] = 'The Embedded discussion plugin stores user posts, reactions and anonymous handles.';
-$string['privacy:metadata:handle'] = 'The anonymous handle assigned to a student in a thread.';
-$string['privacy:metadata:handle:handleindex'] = 'The handle index in the master list.';
-$string['privacy:metadata:handle:userid'] = 'The user assigned the handle.';
-$string['privacy:metadata:post'] = 'Posts made by users in embedded discussion threads.';
-$string['privacy:metadata:post:content'] = 'The HTML content of the post.';
-$string['privacy:metadata:post:timecreated'] = 'When the post was created.';
-$string['privacy:metadata:post:timemodified'] = 'When the post was last edited.';
-$string['privacy:metadata:post:userid'] = 'The user who created the post.';
-$string['privacy:metadata:reaction'] = 'Emoji reactions on posts.';
-$string['privacy:metadata:reaction:emoji'] = 'The emoji shortcode the user reacted with.';
-$string['privacy:metadata:reaction:timecreated'] = 'When the reaction was made.';
-$string['privacy:metadata:reaction:userid'] = 'The reacting user.';
-$string['rateandcomment'] = 'Rate and comment';
-$string['reacttothispost'] = 'React to this post';
-$string['relativetime'] = '{$a} ago';
-$string['reply'] = 'Reply';
-$string['replytopost'] = 'Reply to post';
-$string['save'] = 'Save';
-$string['setting_adjectives'] = 'Adjective (word one)';
-$string['setting_adjectives_default'] = 'Bright,Calm,Keen,Bold,Clear';
-$string['setting_adjectives_desc'] = 'Comma-separated list of adjectives used as the first word of an anonymous handle.';
-$string['setting_animals'] = 'Animal (word two)';
-$string['setting_animals_default'] = 'Ibis,Kestrel,Heron,Lynx,Merlin';
-$string['setting_animals_desc'] = 'Comma-separated list of animals used as the second word of an anonymous handle.';
-$string['setting_emojis'] = 'Emoji set';
-$string['setting_emojis_desc'] = 'Comma-separated list of shortcode:emoji pairs offered as reactions on posts. For example: thumbsup:👍,heart:❤️,laugh:😂';
-$string['setting_legacycomments'] = 'Use filter for legacy {comments} tokens';
-$string['setting_legacycomments_desc'] = 'If enabled, {comments} is converted to {discussion} during filtering.';
-$string['setting_legacyfilterdisqus'] = 'Use filter for legacy [[filter_disqus]] token';
-$string['setting_legacyfilterdisqus_desc'] = 'If enabled, [[filter_disqus]] is converted to {discussion} during filtering.';
-$string['settings_general'] = 'Anonymous handles';
-$string['settings_legacytokens'] = 'Use filter for legacy tokens';
-$string['settings_legacytokens_desc'] = 'Legacy token conversion is disabled by default. Enable each legacy syntax separately if ' .
-    'you need backward compatibility.';
-$string['startthediscussion'] = 'Start the discussion…';
-$string['threadcontext'] = 'Location';
-$string['threadlastpost'] = 'Last post';
-$string['threadname'] = 'Thread';
-$string['threadnamerequired'] = 'A thread name is required here. Embedded discussions only name themselves automatically inside a Book chapter — elsewhere, give the token an explicit name, for example {discussion:Week 1 questions}.';
-$string['threadnotinitialised'] = 'Loading discussion…';
-$string['threadposts'] = 'Posts';
-$string['threadsincourse'] = 'Embedded discussions';
-$string['threaduninitialised'] = 'Oops. There was meant to be an area for discussion here. Something went wrong. Can you advise your teaching team.';
-$string['totalreactions'] = 'Total reactions';
-$string['viewthread'] = 'View';
+$string['privacy:metadata'] = 'The embedded discussion filter does not store any personal data. Discussions are stored by the Embedded discussion local plugin.';

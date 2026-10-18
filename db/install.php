@@ -15,7 +15,7 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Upgrade steps for filter_embeddiscussion.
+ * Install steps for the embedded discussion filter.
  *
  * @package    filter_embeddiscussion
  * @copyright  2026 Andrew Rowatt <A.J.Rowatt@massey.ac.nz>
@@ -23,24 +23,16 @@
  */
 
 /**
- * Apply database schema changes.
+ * Switch the filter on site-wide.
  *
- * @param int $oldversion the version we are upgrading from
- * @return bool
+ * Without it no embedded discussion is ever shown, to anyone, so an install that left it disabled
+ * would look broken: a teacher adds a discussion from the editor, and it is not there. Filters added
+ * this way go to the end of the filter order, which suits this one: it puts in a placeholder, which
+ * no other filter has anything to do with.
  */
-function xmldb_filter_embeddiscussion_upgrade(int $oldversion): bool {
-    global $DB;
+function xmldb_filter_embeddiscussion_install() {
+    global $CFG;
 
-    $dbman = $DB->get_manager();
-
-    if ($oldversion < 2026050900) {
-        $table = new xmldb_table('filter_embeddiscussion_post');
-        $index = new xmldb_index('userid_idx', XMLDB_INDEX_NOTUNIQUE, ['userid']);
-        if (!$dbman->index_exists($table, $index)) {
-            $dbman->add_index($table, $index);
-        }
-        upgrade_plugin_savepoint(true, 2026050900, 'filter', 'embeddiscussion');
-    }
-
-    return true;
+    require_once($CFG->libdir . '/filterlib.php');
+    filter_set_global_state('embeddiscussion', TEXTFILTER_ON);
 }

@@ -15,7 +15,7 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Version information for Embeddiscussion
+ * Version information for the embedded discussion filter.
  *
  * @package    filter_embeddiscussion
  * @copyright  2026 Andrew Rowatt <A.J.Rowatt@massey.ac.nz>
@@ -24,9 +24,12 @@
 
 defined('MOODLE_INTERNAL') || die();
 
-$plugin->component    = 'filter_embeddiscussion';
-$plugin->release      = '1.0';
-$plugin->version      = 2026062900;
-$plugin->requires     = 2024100700;
-$plugin->supported    = [405, 501];
-$plugin->maturity     = MATURITY_STABLE;
+$plugin->component = 'filter_embeddiscussion';
+$plugin->release = '2.0.0';
+$plugin->version = 2026101800;
+$plugin->requires = 2024100700;
+$plugin->supported = [405, 501];
+$plugin->maturity = MATURITY_BETA;
+$plugin->dependencies = [
+    'local_embeddiscussion' => 2026101800,
+];
